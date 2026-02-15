@@ -1,214 +1,259 @@
 """
-app.py - FastAPI Server for Digit Recognition
-
-This module provides the REST API endpoints for the digit recognizer:
-    - POST /predict: Submit pixel data and receive predictions
-    - GET /health: Server health check
-    - GET /: Serve the frontend application
-
-The server also serves static files from the frontend directory.
+app.py - FastAPI Server with Real-Time WebSocket
+Handles live inference, training triggers, and broadcasts updates.
 """
+import asyncio
+import json
+import time
+from contextlib import asynccontextmanager
+from pathlib import Path
 
-import os
-import sys
-from typing import List, Optional
-from fastapi import FastAPI, HTTPException
+import torch
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, JSONResponse
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
+from fastapi.responses import FileResponse
+from pydantic import BaseModel
 
-# Add parent directories to path
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
-
-from backend.interface.predictor import get_predictor
+from backend.interface.predictor import Predictor
 
 
-# Initialize FastAPI app
-app = FastAPI(
-    title="Digit Recognizer API",
-    description="A machine learning API for recognizing handwritten digits",
-    version="1.0.0"
-)
-
-# Add CORS middleware for frontend access
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# Paths
-BACKEND_DIR = os.path.dirname(os.path.dirname(__file__))
-PROJECT_DIR = os.path.dirname(BACKEND_DIR)
-FRONTEND_DIR = os.path.join(PROJECT_DIR, "frontend")
+# === Globals ===
+predictor: Predictor = None
+connected_clients: set[WebSocket] = set()
+training_in_progress = False
+training_history = {'train_loss': [], 'test_loss': [], 'accuracy': []}
+device = None
 
 
-# --- Pydantic Models ---
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Initialize model on startup."""
+    global predictor, device
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    print(f"Device: {device}")
+    predictor = Predictor(device=device)
+    yield
+    print("Shutting down...")
 
-class PredictRequest(BaseModel):
-    """Request model for prediction endpoint."""
-    pixels: List[float] = Field(
-        ...,
-        description="Array of 784 pixel values (28x28 image) with values 0-255",
-        min_length=784,
-        max_length=784
-    )
-    
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "pixels": [0.0] * 784  # Black image
-            }
+
+app = FastAPI(title="Digit AI - Live Neural Network", lifespan=lifespan)
+
+
+# === Broadcast Helper ===
+async def broadcast(message: dict):
+    """Send message to all connected WebSocket clients."""
+    dead = set()
+    payload = json.dumps(message)
+    for ws in connected_clients:
+        try:
+            await ws.send_text(payload)
+        except Exception:
+            dead.add(ws)
+    connected_clients.difference_update(dead)
+
+
+# === WebSocket Endpoint ===
+@app.websocket("/ws")
+async def websocket_endpoint(ws: WebSocket):
+    await ws.accept()
+    connected_clients.add(ws)
+    print(f"Client connected. Total: {len(connected_clients)}")
+
+    # Send initial state
+    await ws.send_text(json.dumps({
+        'type': 'init',
+        'data': {
+            'model_loaded': predictor.model_loaded,
+            'device': str(device),
+            'training_history': training_history,
         }
+    }))
+
+    try:
+        while True:
+            raw = await ws.receive_text()
+            msg = json.loads(raw)
+
+            if msg['type'] == 'predict':
+                # Real-time inference
+                pixels = msg['data']['pixels']
+                result = predictor.predict(pixels)
+                await ws.send_text(json.dumps({
+                    'type': 'prediction',
+                    'data': result
+                }))
+
+            elif msg['type'] == 'ping':
+                await ws.send_text(json.dumps({'type': 'pong'}))
+
+            elif msg['type'] == 'train':
+                # Start training in background
+                if not training_in_progress:
+                    epochs = msg.get('data', {}).get('epochs', 15)
+                    asyncio.create_task(run_training(epochs))
+
+            elif msg['type'] == 'reset_model':
+                await reset_model()
+
+            elif msg['type'] == 'shutdown':
+                await broadcast({'type': 'shutdown_ack', 'data': {}})
+                import os, signal
+                os.kill(os.getpid(), signal.SIGTERM)
+
+    except WebSocketDisconnect:
+        connected_clients.discard(ws)
+        print(f"Client disconnected. Total: {len(connected_clients)}")
+    except Exception as e:
+        connected_clients.discard(ws)
+        print(f"WebSocket error: {e}")
 
 
-class PredictResponse(BaseModel):
-    """Response model for prediction endpoint."""
-    success: bool
-    digit: int = Field(..., ge=-1, le=9)
-    confidence: float = Field(..., ge=0.0, le=1.0)
-    probabilities: List[float] = Field(..., min_length=10, max_length=10)
-    error: Optional[str] = None
+# === Training Runner ===
+async def run_training(epochs=15):
+    global training_in_progress, predictor, training_history
+    training_in_progress = True
+
+    await broadcast({
+        'type': 'training_started',
+        'data': {'total_epochs': epochs}
+    })
+
+    try:
+        import queue as queue_module
+        from backend.train.train import train_model
+
+        # Thread-safe queue: training thread pushes updates, we poll from async side
+        progress_queue = queue_module.Queue()
+
+        loop = asyncio.get_event_loop()
+
+        def train_sync():
+            return train_model(
+                epochs=epochs,
+                save_path='backend/models/digit_model.pt',
+                progress_queue=progress_queue,
+                device=device
+            )
+
+        # Start training in thread pool
+        train_future = loop.run_in_executor(None, train_sync)
+
+        # Poll the queue every 0.5s and broadcast updates while training runs
+        while not train_future.done():
+            await asyncio.sleep(0.5)
+            # Drain all pending updates from the queue
+            while True:
+                try:
+                    update = progress_queue.get_nowait()
+                    # Broadcast to all connected clients
+                    await broadcast({
+                        'type': 'training_update',
+                        'data': update
+                    })
+                except queue_module.Empty:
+                    break
+
+        # Get final result
+        model, history = train_future.result()
+
+        # Drain any remaining updates
+        while True:
+            try:
+                update = progress_queue.get_nowait()
+                await broadcast({
+                    'type': 'training_update',
+                    'data': update
+                })
+            except queue_module.Empty:
+                break
+
+        # Update training history
+        training_history['train_loss'] = history['train_loss']
+        training_history['test_loss'] = history['test_loss']
+        training_history['accuracy'] = history['accuracy']
+
+        # Reload the model
+        predictor.load_model('backend/models/digit_model.pt')
+
+        # Broadcast completion with full history
+        await broadcast({
+            'type': 'training_complete',
+            'data': {
+                'accuracy': round(history['accuracy'][-1], 2),
+                'epochs': epochs,
+                'history': {
+                    'train_loss': [round(x, 4) for x in history['train_loss']],
+                    'test_loss': [round(x, 4) for x in history['test_loss']],
+                    'accuracy': [round(x, 2) for x in history['accuracy']],
+                }
+            }
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        await broadcast({
+            'type': 'training_error',
+            'data': {'error': str(e)}
+        })
+    finally:
+        training_in_progress = False
 
 
-class HealthResponse(BaseModel):
-    """Response model for health check endpoint."""
-    status: str
-    model_loaded: bool
-    version: str
+async def reset_model():
+    """Delete model and reset predictor."""
+    global predictor, training_history
+    model_path = Path('backend/models/digit_model.pt')
+    if model_path.exists():
+        model_path.unlink()
+
+    predictor = Predictor(device=device)
+    training_history = {'train_loss': [], 'test_loss': [], 'accuracy': []}
+
+    await broadcast({
+        'type': 'model_reset',
+        'data': {'message': 'Model reset. Train a new model to begin.'}
+    })
 
 
-# --- API Endpoints ---
-
-@app.get("/", response_class=FileResponse)
-async def serve_frontend():
-    """
-    Serve the main frontend HTML page.
-    """
-    index_path = os.path.join(FRONTEND_DIR, "index.html")
-    if os.path.exists(index_path):
-        return FileResponse(index_path)
-    raise HTTPException(status_code=404, detail="Frontend not found")
+# === REST Endpoints ===
+class PredictRequest(BaseModel):
+    pixels: list[float]
 
 
-@app.get("/health", response_model=HealthResponse)
-async def health_check():
-    """
-    Check server health and model status.
-    """
-    predictor = get_predictor()
-    return HealthResponse(
-        status="healthy",
-        model_loaded=predictor.is_loaded,
-        version="1.0.0"
-    )
+@app.post("/api/predict")
+async def predict_rest(req: PredictRequest):
+    """REST fallback for prediction."""
+    result = predictor.predict(req.pixels)
+    return result
 
 
-@app.post("/predict", response_model=PredictResponse)
-async def predict_digit(request: PredictRequest):
-    """
-    Predict a digit from pixel data.
-    
-    Accepts a 784-element array representing a 28x28 grayscale image.
-    Pixel values should be in the range 0-255.
-    
-    Returns the predicted digit (0-9), confidence score, and 
-    probability distribution across all digits.
-    """
-    predictor = get_predictor()
-    
-    if not predictor.is_loaded:
-        return PredictResponse(
-            success=False,
-            digit=-1,
-            confidence=0.0,
-            probabilities=[0.0] * 10,
-            error="Model not loaded. Please train the model first."
-        )
-    
-    # Get prediction
-    result = predictor.predict(request.pixels)
-    
-    return PredictResponse(
-        success=result['success'],
-        digit=result['digit'],
-        confidence=result['confidence'],
-        probabilities=result['probabilities'],
-        error=result.get('error')
-    )
-
-
-@app.post("/predict/top-k")
-async def predict_top_k(request: PredictRequest, k: int = 3):
-    """
-    Get top-k predictions for the given pixel data.
-    
-    Args:
-        request: Pixel data
-        k: Number of top predictions to return (1-10)
-    """
-    predictor = get_predictor()
-    
-    if not predictor.is_loaded:
-        raise HTTPException(status_code=503, detail="Model not loaded")
-    
-    k = max(1, min(k, 10))  # Clamp k to valid range
-    result = predictor.get_top_k(request.pixels, k=k)
-    
+@app.get("/api/status")
+async def status():
     return {
-        "success": result['success'],
-        "predictions": [
-            {"digit": d, "probability": p}
-            for d, p in result['predictions']
-        ],
-        "all_probabilities": result['probabilities']
+        'model_loaded': predictor.model_loaded,
+        'device': str(device),
+        'training_in_progress': training_in_progress,
+        'connected_clients': len(connected_clients),
+        'avg_inference_ms': predictor.get_avg_inference_ms(),
+        'fps': predictor.fps,
     }
 
 
-# --- Static Files ---
-
-# Mount static files for frontend assets (CSS, JS)
-if os.path.exists(FRONTEND_DIR):
-    app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
-    
-    # Also serve files directly from frontend root
-    @app.get("/{filename:path}")
-    async def serve_static(filename: str):
-        """Serve static files from frontend directory."""
-        file_path = os.path.join(FRONTEND_DIR, filename)
-        if os.path.exists(file_path) and os.path.isfile(file_path):
-            return FileResponse(file_path)
-        raise HTTPException(status_code=404, detail="File not found")
+@app.post("/api/shutdown")
+async def shutdown():
+    """Shut down the server from UI."""
+    import os, signal
+    await broadcast({'type': 'shutdown_ack', 'data': {}})
+    os.kill(os.getpid(), signal.SIGTERM)
+    return {'status': 'shutting_down'}
 
 
-# --- Startup Event ---
-
-@app.on_event("startup")
-async def startup_event():
-    """Initialize resources on server startup."""
-    print("\n" + "=" * 50)
-    print("  Digit Recognizer API Starting...")
-    print("=" * 50)
-    
-    # Pre-load the predictor
-    predictor = get_predictor()
-    
-    if predictor.is_loaded:
-        print("  ✓ Model loaded successfully")
-    else:
-        print("  ⚠ Model not loaded - train it first!")
-        print("    Run: python -m backend.train.train")
-    
-    print("\n  Endpoints:")
-    print("    GET  /         - Frontend UI")
-    print("    GET  /health   - Health check")
-    print("    POST /predict  - Digit prediction")
-    print("=" * 50 + "\n")
+# === Serve Frontend ===
+frontend_dir = Path(__file__).parent.parent.parent / 'frontend'
+app.mount("/static", StaticFiles(directory=str(frontend_dir)), name="static")
 
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+@app.get("/")
+async def serve_index():
+    return FileResponse(str(frontend_dir / 'index.html'))

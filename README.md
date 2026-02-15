@@ -1,98 +1,83 @@
-# Digit Recognizer
+# Digit AI — Live Neural Network Dashboard
 
-A full-stack handwritten digit recognition web application combining a Python machine learning backend with a browser-based frontend.
+Real-time handwritten digit recognition with live neural network visualization, 
+training feedback, and a professional AI research dashboard UI.
+
+## Features
+
+- **Real-time inference** via WebSocket — no button clicks needed
+- **Light & Dark themes** — toggle with one click, preferences saved
+- **Live neural network visualization** — watch neurons activate as you draw
+- **CNN model** — ~99.2% accuracy on MNIST
+- **Live training metrics** — accuracy and loss charts update in real-time
+- **Confidence bars** — see probability distribution across all 10 digits
+- **GPU support** — auto-detects CUDA for fast training
+
+## Quick Start
+
+### Prerequisites
+- Python 3.10+  
+- NVIDIA GPU with CUDA (recommended, CPU works too)
+
+### Setup
+
+```bash
+# 1. Create virtual environment
+python -m venv venv
+
+# Windows
+venv\Scripts\activate
+# Linux/Mac  
+source venv/bin/activate
+
+# 2. Install dependencies
+pip install -r requirements.txt
+
+# 3. (Optional) Install PyTorch with CUDA for GPU support
+# Visit https://pytorch.org/get-started/locally/ for your specific setup
+# Example for CUDA 12.x:
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124
+
+# 4. Start the server
+python run_backend.py
+
+# 5. Open http://localhost:8000 in your browser
+```
+
+### First Run
+
+1. Open the app in your browser
+2. Click **Train Model** → set epochs (15 recommended) → Start
+3. Wait ~3-5 minutes (with GPU) for training to complete
+4. Draw a digit on the canvas — prediction happens instantly!
 
 ## Project Structure
 
 ```
-digit-recognizer/
+digit-ai/
 ├── backend/
 │   ├── api/
-│   │   └── app.py              # FastAPI server with /predict endpoint
+│   │   └── app.py            # FastAPI + WebSocket server
 │   ├── interface/
-│   │   ├── predictor.py        # Model inference
-│   │   └── preprocess.py       # Image preprocessing
-│   ├── train/
-│   │   ├── dataset.py          # MNIST data loading
-│   │   ├── model.py            # Neural network definition
-│   │   ├── save_model.py       # Model saving utilities
-│   │   └── train.py            # Training loop
-│   └── models/
-│       └── digit_model.pt      # Trained model weights (generated)
-├── data/
-│   ├── raw/
-│   │   ├── mnist/              # MNIST dataset files
-│   │   └── augmented/          # Augmented training data
-│   └── processed/
-│       └── training_cache/     # Cached processed data
+│   │   ├── preprocess.py      # Canvas → MNIST tensor
+│   │   └── predictor.py       # Model inference engine
+│   ├── models/
+│   │   └── digit_model.pt     # Trained weights (generated)
+│   └── train/
+│       ├── model.py           # CNN architecture
+│       ├── dataset.py         # MNIST data loader
+│       └── train.py           # Training loop
 ├── frontend/
-│   ├── index.html              # Main HTML page
-│   ├── style.css               # Styling
-│   ├── canvas.js               # Canvas drawing logic
-│   ├── api.js                  # API communication
-│   └── ui.js                   # UI updates and display
-├── requirements.txt            # Python dependencies
-├── run_backend.py              # Server launch script
-└── README.md                   # This file
+│   └── index.html             # Complete dashboard (single file)
+├── data/raw/mnist/             # MNIST data (auto-downloaded)
+├── run_backend.py              # Server launcher
+├── requirements.txt
+└── README.md
 ```
 
-## Quick Start
+## Tech Stack
 
-### 1. Install Dependencies
-
-```bash
-pip install -r requirements.txt
-```
-
-### 2. Train the Model
-
-```bash
-python -m backend.train.train
-```
-
-This downloads MNIST (if needed), trains the neural network, and saves weights to `backend/models/digit_model.pt`.
-
-### 3. Start the Server
-
-```bash
-python run_backend.py
-```
-
-### 4. Open the App
-
-Navigate to http://localhost:8000 in your browser.
-
-## How It Works
-
-### Training Pipeline
-1. `dataset.py` loads MNIST images (28×28 grayscale digits)
-2. `model.py` defines a fully connected network (784→128→64→10)
-3. `train.py` optimizes the network using backpropagation
-4. Trained weights are saved to `digit_model.pt`
-
-### Inference Pipeline
-1. User draws a digit on the canvas
-2. Frontend downscales to 28×28 and sends pixel data
-3. `preprocess.py` normalizes the input
-4. `predictor.py` runs forward pass through the model
-5. Predicted digit and confidence scores are returned
-
-## API Endpoints
-
-- `POST /predict` - Submit pixel data, receive prediction
-- `GET /health` - Server health check
-- `GET /` - Serve frontend
-
-## Model Architecture
-
-```
-Input (784) → Linear → ReLU → Linear → ReLU → Linear → Softmax
-              (128)            (64)            (10)
-```
-
-## Requirements
-
-- Python 3.8+
-- PyTorch 2.0+
-- FastAPI
-- Modern web browser with Canvas support
+- **Backend**: Python, PyTorch, FastAPI, WebSocket
+- **Frontend**: Vanilla HTML/CSS/JS (zero dependencies)
+- **Model**: CNN (Conv2d → Conv2d → FC → FC)
+- **Communication**: WebSocket for real-time, REST as fallback

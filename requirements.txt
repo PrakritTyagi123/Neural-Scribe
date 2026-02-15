@@ -1,15 +1,7 @@
-# Digit Recognizer - Dependencies
-# Web Framework
-fastapi>=0.104.0
-uvicorn>=0.24.0
-
-# Machine Learning
 torch>=2.0.0
 torchvision>=0.15.0
-
-# Data Processing
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+websockets>=12.0
 numpy>=1.24.0
-Pillow>=10.0.0
-
-# Utilities
-python-multipart>=0.0.6
+pydantic>=2.0.0
