@@ -1,12 +1,13 @@
 """
 predictor.py - Real-Time Inference Engine
-Loads trained model and performs fast prediction with activation data for visualization.
+Loads trained EMNIST model and performs prediction with character label mapping.
 """
 import torch
 import torch.nn.functional as F
 import os
 import time
 from backend.train.model import DigitCNN
+from backend.train.dataset import EMNIST_LABELS, NUM_CLASSES
 from backend.interface.preprocess import preprocess_pixels
 
 
@@ -38,23 +39,16 @@ class Predictor:
             return False
 
     def predict(self, pixel_data: list[float]) -> dict:
-        """
-        Run inference on pixel data.
-        
-        Returns:
-            {
-                'digit': int,
-                'confidence': float,
-                'probabilities': list[float],  # 10 values
-                'activations': dict,            # layer activations for viz
-                'inference_ms': float
-            }
-        """
         if not self.model_loaded:
             return {
-                'digit': -1,
+                'label': '?',
+                'class_index': -1,
+                'digit': '?',
                 'confidence': 0.0,
-                'probabilities': [0.0] * 10,
+                'probabilities': [0.0] * NUM_CLASSES,
+                'is_digit': False,
+                'is_upper': False,
+                'is_lower': False,
                 'activations': {},
                 'inference_ms': 0.0,
                 'error': 'Model not loaded'
@@ -62,10 +56,8 @@ class Predictor:
 
         start = time.perf_counter()
 
-        # Preprocess
         tensor = preprocess_pixels(pixel_data, self.device)
 
-        # Inference
         with torch.no_grad():
             logits = self.model(tensor)
             probs = F.softmax(logits, dim=1).squeeze(0)
@@ -73,16 +65,25 @@ class Predictor:
         inference_ms = (time.perf_counter() - start) * 1000
         self.inference_times.append(inference_ms)
 
-        digit = probs.argmax().item()
-        confidence = probs[digit].item()
+        class_idx = probs.argmax().item()
+        confidence = probs[class_idx].item()
+        label = EMNIST_LABELS[class_idx] if class_idx < len(EMNIST_LABELS) else '?'
 
-        # Get layer activations for network visualization
+        is_digit = class_idx < 10
+        is_upper = 10 <= class_idx <= 35
+        is_lower = class_idx >= 36
+
         activations = self.model.get_activations()
 
         return {
-            'digit': digit,
+            'label': label,
+            'class_index': class_idx,
+            'digit': label,  # backward compat
             'confidence': round(confidence * 100, 1),
             'probabilities': [round(p.item() * 100, 1) for p in probs],
+            'is_digit': is_digit,
+            'is_upper': is_upper,
+            'is_lower': is_lower,
             'activations': activations,
             'inference_ms': round(inference_ms, 2),
         }

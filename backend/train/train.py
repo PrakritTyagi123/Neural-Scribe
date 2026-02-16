@@ -1,6 +1,6 @@
 """
 train.py - Training Loop with Live Progress
-Trains the CNN model and puts epoch updates into a thread-safe queue
+Trains the CNN model on EMNIST ByMerge and pushes epoch updates into a queue
 so the async server can broadcast them in real time.
 """
 import torch
@@ -15,28 +15,15 @@ from backend.train.dataset import get_data_loaders
 def train_model(epochs=15, lr=0.001, batch_size=64, save_path='backend/models/digit_model.pt',
                 progress_queue=None, device=None):
     """
-    Train the CNN model on MNIST.
-    
-    Args:
-        epochs: Number of training epochs
-        lr: Learning rate
-        batch_size: Batch size for training
-        save_path: Path to save the trained model
-        progress_queue: thread-safe queue.Queue — push epoch dicts into it
-        device: torch device (auto-detected if None)
-    
-    Returns:
-        (model, history_dict)
+    Train the CNN model on EMNIST ByMerge (47 classes).
     """
     if device is None:
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     print(f"Training on: {device}")
 
-    # Load data
     train_loader, test_loader = get_data_loaders(batch_size=batch_size)
 
-    # Create model
     model = DigitCNN().to(device)
     print(f"Model parameters: {model.count_parameters():,}")
 
@@ -56,14 +43,14 @@ def train_model(epochs=15, lr=0.001, batch_size=64, save_path='backend/models/di
     for epoch in range(epochs):
         epoch_start = time.time()
 
-        # === Training Phase ===
         model.train()
         running_loss = 0.0
         train_correct = 0
         train_total = 0
 
         for batch_idx, (data, target) in enumerate(train_loader):
-            data, target = data.to(device), target.to(device)
+            data = data.to(device, non_blocking=True)
+            target = target.to(device, non_blocking=True)
 
             optimizer.zero_grad()
             output = model(data)
@@ -79,7 +66,6 @@ def train_model(epochs=15, lr=0.001, batch_size=64, save_path='backend/models/di
         train_loss = running_loss / len(train_loader)
         train_acc = 100.0 * train_correct / train_total
 
-        # === Evaluation Phase ===
         model.eval()
         test_loss = 0.0
         correct = 0
@@ -98,16 +84,13 @@ def train_model(epochs=15, lr=0.001, batch_size=64, save_path='backend/models/di
         accuracy = 100.0 * correct / total
         epoch_time = time.time() - epoch_start
 
-        # Update scheduler
         scheduler.step()
 
-        # Save history
         history['train_loss'].append(train_loss)
         history['test_loss'].append(test_loss)
         history['accuracy'].append(accuracy)
         history['epoch_times'].append(epoch_time)
 
-        # Save best model + history
         if accuracy > best_accuracy:
             best_accuracy = accuracy
             os.makedirs(os.path.dirname(save_path), exist_ok=True)
@@ -128,7 +111,6 @@ def train_model(epochs=15, lr=0.001, batch_size=64, save_path='backend/models/di
               f"Accuracy: {accuracy:.2f}% | "
               f"Time: {epoch_time:.1f}s")
 
-        # Push update into queue (thread-safe, non-blocking)
         if progress_queue is not None:
             update = {
                 'epoch': epoch + 1,
