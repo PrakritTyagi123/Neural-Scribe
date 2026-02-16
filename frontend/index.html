@@ -6,11 +6,10 @@
 <title>Digit AI — Live Neural Network</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet">
 <style>
-:root{--font:'DM Sans',sans-serif;--mono:'JetBrains Mono',monospace;--ease:cubic-bezier(.4,0,.2,1);--t:.2s}
+:root{--font:'DM Sans',sans-serif;--mono:'JetBrains Mono',monospace;--t:.2s}
 
 [data-theme="light"]{
-  --bg:#e9ecf0;
-  --surface:#ffffff;--glass-b:#d0d4dc;--glass-sh:0 1px 8px rgba(0,0,0,.06);
+  --bg:#e9ecf0;--surface:#ffffff;--glass-b:#d0d4dc;--glass-sh:0 1px 6px rgba(0,0,0,.05);
   --inset:#e0e4ea;--border:#c5c9d2;
   --t1:#0b1120;--t2:#4a5468;--t3:#8892a4;
   --ac:#5856f0;--ac-g:linear-gradient(135deg,#5856f0,#7e6df5,#a78bfa);
@@ -24,8 +23,7 @@
   --chart-g:rgba(0,0,0,.06);
 }
 [data-theme="dark"]{
-  --bg:#070a10;
-  --surface:#0f1219;--glass-b:#252b37;--glass-sh:0 1px 8px rgba(0,0,0,.4);
+  --bg:#070a10;--surface:#0f1219;--glass-b:#252b37;--glass-sh:0 1px 6px rgba(0,0,0,.35);
   --inset:#0a0d15;--border:#2a3040;
   --t1:#e4e9f2;--t2:#8a93a6;--t3:#4e5668;
   --ac:#7274f9;--ac-g:linear-gradient(135deg,#6366f1,#8b7cf8,#c084fc);
@@ -40,137 +38,152 @@
 }
 
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
-html,body{height:100%;overflow:hidden}
-body{font-family:var(--font);background:var(--bg);color:var(--t1);-webkit-font-smoothing:antialiased;transition:background var(--t),color var(--t)}
+html{height:100%}
+body{font-family:var(--font);background:var(--bg);color:var(--t1);-webkit-font-smoothing:antialiased;transition:background var(--t),color var(--t);min-height:100%}
 
-/* PAGE */
-.page{height:100vh;display:flex;flex-direction:column;max-width:1440px;margin:0 auto;padding:10px 20px 6px}
+/* PAGE — natural flow, compact enough to fit one screen */
+.page{max-width:1440px;margin:0 auto;padding:8px 16px 6px}
 
 /* HEADER */
-.hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-shrink:0}
+.hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-shrink:0}
 .logo{display:flex;align-items:center;gap:6px}
-.logo-i{width:28px;height:28px;border-radius:7px;background:var(--ac-g);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:700;font-size:.65rem;color:#fff;box-shadow:0 2px 8px var(--ac-glow)}
-.logo-t{font-size:1.05rem;font-weight:700;letter-spacing:-.02em;background:var(--ac-g);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.logo-i{width:26px;height:26px;border-radius:6px;background:var(--ac-g);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:700;font-size:.6rem;color:#fff;box-shadow:0 2px 8px var(--ac-glow)}
+.logo-t{font-size:1rem;font-weight:700;letter-spacing:-.02em;background:var(--ac-g);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
 .hdr-r{display:flex;align-items:center;gap:8px}
-.pill{display:flex;align-items:center;gap:4px;padding:3px 8px;border-radius:12px;font-size:.6rem;font-weight:600}
+.pill{display:flex;align-items:center;gap:4px;padding:2px 8px;border-radius:12px;font-size:.58rem;font-weight:600}
 .pill-ok{background:var(--ok-s);color:var(--ok)}.pill-off{background:var(--err-s);color:var(--err)}.pill-tr{background:var(--warn-s);color:var(--warn)}
 .dot{width:5px;height:5px;border-radius:50%;background:currentColor;animation:pls 2s ease-in-out infinite}
 @keyframes pls{0%,100%{opacity:1}50%{opacity:.3}}
-.th{width:36px;height:18px;border-radius:9px;border:1px solid var(--border);background:var(--inset);cursor:pointer;position:relative;transition:background var(--t)}
-.th::after{content:'';position:absolute;top:1.5px;left:1.5px;width:13px;height:13px;border-radius:50%;background:var(--ac);transition:transform var(--t);box-shadow:0 1px 3px rgba(0,0,0,.25)}
-[data-theme="dark"] .th::after{transform:translateX(18px)}
-.th .i{position:absolute;top:1px;font-size:9px;line-height:16px}.th .i.s{left:3px}.th .i.m{right:3px}
-.hdr-btn{padding:3px 8px;border-radius:5px;border:1px solid var(--border);background:var(--surface);color:var(--err);font-family:var(--font);font-size:.6rem;font-weight:600;cursor:pointer;transition:all var(--t);display:flex;align-items:center;gap:3px}
+.th{width:34px;height:17px;border-radius:9px;border:1px solid var(--border);background:var(--inset);cursor:pointer;position:relative;transition:background var(--t)}
+.th::after{content:'';position:absolute;top:1.5px;left:1.5px;width:12px;height:12px;border-radius:50%;background:var(--ac);transition:transform var(--t);box-shadow:0 1px 3px rgba(0,0,0,.25)}
+[data-theme="dark"] .th::after{transform:translateX(17px)}
+.th .i{position:absolute;top:1px;font-size:8px;line-height:15px}.th .i.s{left:3px}.th .i.m{right:3px}
+.hdr-btn{padding:3px 8px;border-radius:5px;border:1.5px solid var(--border);background:var(--surface);color:var(--err);font-family:var(--font);font-size:.58rem;font-weight:600;cursor:pointer;transition:all var(--t);display:flex;align-items:center;gap:3px}
 .hdr-btn:hover{background:var(--err-s);border-color:var(--err)}
 .hdr-btn svg{width:10px;height:10px}
 
-/* GRID */
+/* ================================================================
+   MAIN GRID — 4 columns, 2 rows, both rows sized to content
+   Col: [left 260px] [network flex] [graphs 200px]
+   Row 1 height = network height = 280px
+   Row 2 height = remaining
+   ================================================================ */
 .grid{
-  flex:1;min-height:0;
   display:grid;
-  grid-template-columns:250px 1fr 220px;
-  grid-template-rows:1fr auto;
-  gap:10px;
-  overflow:hidden;
+  grid-template-columns:260px 1fr 200px;
+  grid-template-rows:280px auto;
+  gap:8px;
+  margin-top:8px;
 }
 
-/* CARD — solid bg, visible border */
-.c{
-  background:var(--surface);
-  border:1.5px solid var(--glass-b);border-radius:10px;
-  box-shadow:var(--glass-sh);padding:10px;
-  transition:background var(--t),border-color var(--t);
-}
-.c-h{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
-.c-t{font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--t3)}
-.tag{font-family:var(--mono);font-size:.5rem;padding:1px 5px;border-radius:3px;background:var(--ac-soft);color:var(--ac);font-weight:700}
+/* CARD */
+.c{background:var(--surface);border:1.5px solid var(--glass-b);border-radius:8px;box-shadow:var(--glass-sh);padding:8px;transition:background var(--t),border-color var(--t);overflow:hidden}
+.c-h{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px}
+.c-t{font-size:.55rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--t3)}
+.tag{font-family:var(--mono);font-size:.48rem;padding:1px 5px;border-radius:3px;background:var(--ac-soft);color:var(--ac);font-weight:700}
 
-/* R1C1: DRAW — bigger */
+/* ================================================================
+   R1C1: DRAW AREA — canvas is square, fills the card width
+   ================================================================ */
 .draw-cell{grid-row:1;grid-column:1;display:flex;flex-direction:column}
 .cvs-w{
-  width:228px;height:228px;
-  background:#000;border-radius:7px;border:1.5px solid var(--border);
+  flex:1;min-height:0;
+  aspect-ratio:1;
+  max-height:calc(280px - 30px); /* card height minus header */
+  width:auto;
+  align-self:center;
+  background:#000;border-radius:6px;border:1.5px solid var(--border);
   overflow:hidden;cursor:crosshair;position:relative;
 }
 #drawCanvas{width:100%;height:100%;display:block;touch-action:none}
 .cvs-w::after{content:'';position:absolute;inset:0;pointer-events:none;
-  background-image:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px);
+  background-image:linear-gradient(rgba(255,255,255,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.03) 1px,transparent 1px);
   background-size:calc(100%/28) calc(100%/28)}
 
-/* R1C2: NETWORK — fixed 300px */
+/* ================================================================
+   R1C2: NEURAL NETWORK — exactly 280px tall
+   ================================================================ */
 .net-cell{
   grid-row:1;grid-column:2;
-  height:300px;
   display:flex;flex-direction:column;
-  background:var(--surface);border:1.5px solid var(--glass-b);border-radius:10px;box-shadow:var(--glass-sh);
+  background:var(--surface);border:1.5px solid var(--glass-b);border-radius:8px;box-shadow:var(--glass-sh);
   transition:background var(--t),border-color var(--t);overflow:hidden;
 }
-.net-top{display:flex;justify-content:space-between;align-items:center;padding:8px 12px 0;flex-shrink:0}
+.net-top{display:flex;justify-content:space-between;align-items:center;padding:6px 10px 0;flex-shrink:0}
 #netCvs{flex:1;width:100%;display:block;min-height:0}
-.net-lbl{display:flex;justify-content:space-between;padding:4px 20px 8px;flex-shrink:0;font-size:.5rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--t3)}
+.net-lbl{display:flex;justify-content:space-between;padding:3px 16px 6px;flex-shrink:0;font-size:.48rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--t3)}
 
-/* R1C3: ACCURACY — square */
+/* ================================================================
+   R1C3: ACCURACY GRAPH — square, fits in 280px row
+   ================================================================ */
 .acc-cell{grid-row:1;grid-column:3;display:flex;flex-direction:column}
-.ch-area{flex:1;min-height:0;position:relative;aspect-ratio:1}
-.ch-area canvas{width:100%!important;height:100%!important;display:block}
+.ch-wrap{flex:1;min-height:0;display:flex;align-items:center;justify-content:center}
+.ch-sq{width:180px;height:180px;position:relative}
+.ch-sq canvas{width:100%!important;height:100%!important;display:block}
 
-/* R2C1: BUTTONS+PRED — bigger */
-.bot-left{grid-row:2;grid-column:1;display:flex;flex-direction:column;gap:8px}
-.btns{display:flex;gap:5px}
-.b{flex:1;padding:7px;border:1.5px solid var(--border);border-radius:6px;background:var(--surface);color:var(--t1);font-family:var(--font);font-size:.65rem;font-weight:600;cursor:pointer;transition:all var(--t);display:flex;align-items:center;justify-content:center;gap:3px}
-.b:hover{border-color:var(--ac);background:var(--ac-soft)}.b svg{width:11px;height:11px}
+/* ================================================================
+   R2C1: BUTTONS + PREDICTION + SYSTEM
+   ================================================================ */
+.bot-left{grid-row:2;grid-column:1;display:flex;flex-direction:column;gap:6px}
+.btns{display:flex;gap:4px;flex-shrink:0}
+.b{flex:1;padding:6px;border:1.5px solid var(--border);border-radius:5px;background:var(--surface);color:var(--t1);font-family:var(--font);font-size:.62rem;font-weight:600;cursor:pointer;transition:all var(--t);display:flex;align-items:center;justify-content:center;gap:3px}
+.b:hover{border-color:var(--ac);background:var(--ac-soft)}.b svg{width:10px;height:10px}
 .b-a{background:var(--ac);color:#fff;border-color:var(--ac)}.b-a:hover{filter:brightness(1.1)}
 .b-d{color:var(--err)}.b-d:hover{background:var(--err-s);border-color:var(--err)}
 
-.pred{display:flex;align-items:center;gap:10px;margin-top:6px}
-.pred-d{width:50px;height:50px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:1.8rem;font-weight:700;color:var(--ac);background:var(--ac-soft);border-radius:8px;border:2px solid transparent;transition:all .25s}
-.pred-d.on{border-color:var(--ac);box-shadow:0 0 14px var(--ac-glow)}
-.pred-i .lb{font-size:.52rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--t3)}
-.pred-i .cv{font-family:var(--mono);font-size:1.15rem;font-weight:700}
-.pred-i .ms{font-family:var(--mono);font-size:.58rem;color:var(--t3)}
+.pred{display:flex;align-items:center;gap:8px;margin-top:4px}
+.pred-d{width:46px;height:46px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:1.6rem;font-weight:700;color:var(--ac);background:var(--ac-soft);border-radius:7px;border:2px solid transparent;transition:all .25s;flex-shrink:0}
+.pred-d.on{border-color:var(--ac);box-shadow:0 0 12px var(--ac-glow)}
+.pred-i .lb{font-size:.48rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--t3)}
+.pred-i .cv{font-family:var(--mono);font-size:1.05rem;font-weight:700}
+.pred-i .ms{font-family:var(--mono);font-size:.52rem;color:var(--t3)}
 
-.sts{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:6px}
-.st{padding:5px 6px;background:var(--inset);border-radius:5px;border:1.5px solid var(--border)}
-.st-l{font-size:.48rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--t3)}
-.st-v{font-family:var(--mono);font-size:.75rem;font-weight:700}
+.sts{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:4px}
+.st{padding:4px 5px;background:var(--inset);border-radius:4px;border:1.5px solid var(--border)}
+.st-l{font-size:.44rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--t3)}
+.st-v{font-family:var(--mono);font-size:.7rem;font-weight:700}
 .c-ok{color:var(--ok)}.c-ac{color:var(--ac)}.c-w{color:var(--warn)}
 
-.prg{display:none;margin-top:5px}.prg.on{display:block}
-.prg-tr{width:100%;height:4px;background:var(--bar);border-radius:2px;overflow:hidden;margin-bottom:3px}
+.prg{display:none;margin-top:4px}.prg.on{display:block}
+.prg-tr{width:100%;height:3px;background:var(--bar);border-radius:2px;overflow:hidden;margin-bottom:2px}
 .prg-fl{height:100%;background:var(--ac-g);border-radius:2px;width:0%;transition:width .4s}
-.prg-t{display:flex;justify-content:space-between;font-family:var(--mono);font-size:.52rem;color:var(--t3)}
+.prg-t{display:flex;justify-content:space-between;font-family:var(--mono);font-size:.48rem;color:var(--t3)}
 
-/* R2C2: CONFIDENCE */
-.conf-cell{grid-row:2;grid-column:2}
+/* ================================================================
+   R2C2: CONFIDENCE BARS — fills remaining height
+   ================================================================ */
+.conf-cell{grid-row:2;grid-column:2;display:flex;flex-direction:column}
 .cb{display:flex;flex-direction:column;gap:3px}
-.cr{display:flex;align-items:center;gap:5px;height:22px}
-.cr-l{font-family:var(--mono);font-size:.62rem;font-weight:700;width:12px;text-align:center;color:var(--t3)}
-.cr-tk{flex:1;height:16px;background:var(--bar);border-radius:3px;overflow:hidden}
+.cr{display:flex;align-items:center;gap:5px;height:24px}
+.cr-l{font-family:var(--mono);font-size:.6rem;font-weight:700;width:12px;text-align:center;color:var(--t3)}
+.cr-tk{flex:1;height:60%;min-height:12px;max-height:22px;background:var(--bar);border-radius:3px;overflow:hidden}
 .cr-fl{height:100%;border-radius:3px;background:var(--ac);opacity:.35;width:0%;transition:width .1s,opacity .1s}
 .cr-fl.hit{opacity:1;background:var(--ac-g);box-shadow:0 0 6px var(--ac-glow)}
-.cr-v{font-family:var(--mono);font-size:.58rem;font-weight:600;width:38px;text-align:right;color:var(--t3);transition:color .1s}
+.cr-v{font-family:var(--mono);font-size:.55rem;font-weight:600;width:36px;text-align:right;color:var(--t3);transition:color .1s}
 .cr-v.hit{color:var(--ac);font-weight:700}
 
-/* R2C3: LOSS — square */
+/* ================================================================
+   R2C3: LOSS GRAPH — square
+   ================================================================ */
 .loss-cell{grid-row:2;grid-column:3;display:flex;flex-direction:column}
 
 /* FOOTER */
-.ftr{flex-shrink:0;display:flex;justify-content:space-between;padding:4px 0 0;font-family:var(--mono);font-size:.5rem;color:var(--t3)}
+.ftr{display:flex;justify-content:space-between;padding:4px 0;font-family:var(--mono);font-size:.48rem;color:var(--t3)}
 
 /* MODALS */
 .mo{display:none;position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.5);backdrop-filter:blur(5px);align-items:center;justify-content:center}
 .mo.on{display:flex}
-.mo-b{background:var(--surface);border:1.5px solid var(--glass-b);border-radius:12px;padding:20px;max-width:360px;width:90%;box-shadow:0 16px 50px rgba(0,0,0,.4)}
-.mo-b h2{font-size:.95rem;font-weight:700;margin-bottom:4px}
-.mo-b p{color:var(--t2);font-size:.78rem;margin-bottom:12px}
-.sl-g{margin-bottom:12px}
-.sl-g label{display:flex;justify-content:space-between;font-size:.72rem;font-weight:500;margin-bottom:4px}
+.mo-b{background:var(--surface);border:1.5px solid var(--glass-b);border-radius:10px;padding:18px;max-width:340px;width:90%;box-shadow:0 12px 40px rgba(0,0,0,.4)}
+.mo-b h2{font-size:.9rem;font-weight:700;margin-bottom:4px}
+.mo-b p{color:var(--t2);font-size:.75rem;margin-bottom:10px}
+.sl-g{margin-bottom:10px}
+.sl-g label{display:flex;justify-content:space-between;font-size:.7rem;font-weight:500;margin-bottom:4px}
 .sl-g label span{font-family:var(--mono);color:var(--ac)}
 input[type=range]{width:100%;height:3px;-webkit-appearance:none;background:var(--bar);border-radius:2px;outline:none}
-input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;border-radius:50%;background:var(--ac);cursor:pointer;box-shadow:0 0 6px var(--ac-glow)}
-.mo-btn{display:flex;gap:6px}.mo-btn .b{flex:1;padding:7px}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;background:var(--ac);cursor:pointer;box-shadow:0 0 5px var(--ac-glow)}
+.mo-btn{display:flex;gap:6px}.mo-btn .b{flex:1;padding:6px}
 
-@media(max-width:900px){.grid{grid-template-columns:1fr;grid-template-rows:repeat(6,auto)}.draw-cell,.net-cell,.acc-cell,.bot-left,.conf-cell,.loss-cell{grid-row:auto;grid-column:1}.net-cell{height:auto}html,body{overflow:auto}}
+@media(max-width:900px){.grid{grid-template-columns:1fr;grid-template-rows:repeat(6,auto)}.draw-cell,.net-cell,.acc-cell,.bot-left,.conf-cell,.loss-cell{grid-row:auto;grid-column:1}html,body{overflow:auto}}
 </style>
 </head>
 <body>
@@ -184,19 +197,27 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;heigh
   </div>
 </header>
 <div class="grid">
+
+  <!-- R1C1: Draw -->
   <div class="c draw-cell">
     <div class="c-h"><span class="c-t">Draw</span><span class="tag">28×28</span></div>
     <div class="cvs-w"><canvas id="drawCanvas"></canvas></div>
   </div>
+
+  <!-- R1C2: Network -->
   <div class="net-cell" id="netCard">
     <div class="net-top"><span class="c-t">Neural Network Diagram</span><span class="tag">CNN</span></div>
     <canvas id="netCvs"></canvas>
     <div class="net-lbl"><span>Input</span><span>Conv1</span><span>Conv2</span><span>Dense</span><span>Output 0–9</span></div>
   </div>
+
+  <!-- R1C3: Accuracy -->
   <div class="c acc-cell">
     <div class="c-h"><span class="c-t">Accuracy</span><span class="tag" id="epTag">0 ep</span></div>
-    <div class="ch-area"><canvas id="chAcc"></canvas></div>
+    <div class="ch-wrap"><div class="ch-sq"><canvas id="chAcc"></canvas></div></div>
   </div>
+
+  <!-- R2C1: Buttons + Prediction + System -->
   <div class="bot-left">
     <div class="btns">
       <button class="b" id="btnCl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a1 1 0 011-1h6a1 1 0 011 1v2m2 0v12a2 2 0 01-2 2H8a2 2 0 01-2-2V6h12z"/></svg>Clear</button>
@@ -218,14 +239,19 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;heigh
       <div class="prg" id="prg"><div class="prg-tr"><div class="prg-fl" id="prgFl"></div></div><div class="prg-t"><span id="prgEp">Epoch 0/0</span><span id="prgAc">0%</span></div></div>
     </div>
   </div>
+
+  <!-- R2C2: Confidence -->
   <div class="c conf-cell">
     <div class="c-h"><span class="c-t">Confidence</span><span class="tag">Real-Time</span></div>
     <div class="cb" id="cBars"></div>
   </div>
+
+  <!-- R2C3: Loss -->
   <div class="c loss-cell">
     <div class="c-h"><span class="c-t">Loss</span></div>
-    <div class="ch-area"><canvas id="chLoss"></canvas></div>
+    <div class="ch-wrap"><div class="ch-sq"><canvas id="chLoss"></canvas></div></div>
   </div>
+
 </div>
 <div class="ftr"><span id="fSt">Connecting...</span><span id="fFps">— FPS</span></div>
 </div>
@@ -243,21 +269,26 @@ $('thBtn').onclick=()=>{const n=document.documentElement.getAttribute('data-them
 
 const cb=$('cBars');for(let i=0;i<10;i++)cb.innerHTML+=`<div class="cr"><span class="cr-l">${i}</span><div class="cr-tk"><div class="cr-fl" id="b${i}"></div></div><span class="cr-v" id="v${i}">0%</span></div>`;
 
-// DRAW
+/* DRAW — canvas size matches the wrapper dynamically */
 const dc=$('drawCanvas'),dx=dc.getContext('2d');
-let isDr=false,hasCt=false,lx,ly;
-function initDr(){dc.width=228;dc.height=228;dx.lineCap='round';dx.lineJoin='round';clrCvs()}
-function clrCvs(){dx.fillStyle='#000';dx.fillRect(0,0,228,228);hasCt=false;updPred(null)}
-function gP(e){const r=dc.getBoundingClientRect(),t=e.touches?e.touches[0]:e;return{x:(t.clientX-r.left)*(228/r.width),y:(t.clientY-r.top)*(228/r.height)}}
+let isDr=false,hasCt=false,lx,ly,cvsSz=200;
+function initDr(){
+  const r=dc.parentElement.getBoundingClientRect();
+  cvsSz=Math.round(Math.min(r.width,r.height));
+  dc.width=cvsSz;dc.height=cvsSz;
+  dx.lineCap='round';dx.lineJoin='round';clrCvs();
+}
+function clrCvs(){dx.fillStyle='#000';dx.fillRect(0,0,cvsSz,cvsSz);hasCt=false;updPred(null)}
+function gP(e){const r=dc.getBoundingClientRect(),t=e.touches?e.touches[0]:e;return{x:(t.clientX-r.left)*(cvsSz/r.width),y:(t.clientY-r.top)*(cvsSz/r.height)}}
 function sD(e){e.preventDefault();isDr=true;const p=gP(e);lx=p.x;ly=p.y}
-function mD(e){if(!isDr)return;e.preventDefault();const p=gP(e);dx.strokeStyle='#fff';dx.lineWidth=16;dx.beginPath();dx.moveTo(lx,ly);dx.lineTo(p.x,p.y);dx.stroke();lx=p.x;ly=p.y;hasCt=true;reqPred()}
+function mD(e){if(!isDr)return;e.preventDefault();const p=gP(e);dx.strokeStyle='#fff';dx.lineWidth=cvsSz/14;dx.beginPath();dx.moveTo(lx,ly);dx.lineTo(p.x,p.y);dx.stroke();lx=p.x;ly=p.y;hasCt=true;reqPred()}
 function eD(){isDr=false;if(hasCt)reqPred()}
 dc.addEventListener('mousedown',sD);dc.addEventListener('mousemove',mD);dc.addEventListener('mouseup',eD);dc.addEventListener('mouseleave',eD);
 dc.addEventListener('touchstart',sD,{passive:false});dc.addEventListener('touchmove',mD,{passive:false});dc.addEventListener('touchend',eD);
 
 function getPx(){
-  const sd=dx.getImageData(0,0,228,228);let x0=228,y0=228,x1=0,y1=0,f=false;
-  for(let y=0;y<228;y++)for(let x=0;x<228;x++){const i=(y*228+x)*4,b=.299*sd.data[i]+.587*sd.data[i+1]+.114*sd.data[i+2];if(b>30){if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y;f=true}}
+  const sd=dx.getImageData(0,0,cvsSz,cvsSz);let x0=cvsSz,y0=cvsSz,x1=0,y1=0,f=false;
+  for(let y=0;y<cvsSz;y++)for(let x=0;x<cvsSz;x++){const i=(y*cvsSz+x)*4,b=.299*sd.data[i]+.587*sd.data[i+1]+.114*sd.data[i+2];if(b>30){if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y;f=true}}
   if(!f)return Array(784).fill(0);
   const cw=x1-x0+1,ch=y1-y0+1,t=document.createElement('canvas');t.width=28;t.height=28;
   const tc=t.getContext('2d');tc.fillStyle='#000';tc.fillRect(0,0,28,28);
@@ -268,7 +299,7 @@ function getPx(){
   return Array.from(px);
 }
 
-// WS
+/* WS */
 let ws,wsOk=false,pend=false,lpT=0,lastPD=null;
 function connWS(){const p=location.protocol==='https:'?'wss:':'ws:';ws=new WebSocket(`${p}//${location.host}/ws`);
   ws.onopen=()=>{wsOk=true;setSt('ok','Live');$('fSt').textContent='Live inference running'};
@@ -280,13 +311,16 @@ function onMsg(m){switch(m.type){
   case'init':
     if(m.data.model_loaded)$('mSt').textContent='Ready';
     $('sDev').textContent=m.data.device||'—';
-    if(m.data.training_history && m.data.training_history.accuracy && m.data.training_history.accuracy.length>0){
-      tD=m.data.training_history;renderCharts();
+    if(m.data.training_history&&m.data.training_history.accuracy&&m.data.training_history.accuracy.length>0){
+      tD=m.data.training_history;
+      // Ensure arrays exist
+      if(!tD.train_loss)tD.train_loss=[];if(!tD.test_loss)tD.test_loss=[];
+      renderCharts();
       $('sAcc').textContent=tD.accuracy[tD.accuracy.length-1]+'%';
       $('epTag').textContent=tD.accuracy.length+' ep';
-      if(tD.train_loss&&tD.train_loss.length)$('sLoss').textContent=tD.train_loss[tD.train_loss.length-1].toFixed(4);
+      if(tD.train_loss.length)$('sLoss').textContent=tD.train_loss[tD.train_loss.length-1].toFixed(4);
     }break;
-  case'prediction':pend=false;if(!m.data.error){lastPD=m.data;updPred(m.data);drawNet(m.data.activations,m.data.probabilities,m.data.digit);updFps(m.data.inference_ms);startAnim()}break;
+  case'prediction':pend=false;if(!m.data.error){lastPD=m.data;updPred(m.data);drawNet(m.data.activations,m.data.probabilities,m.data.digit);updFps(m.data.inference_ms)}break;
   case'training_started':setSt('tr','Training');$('prg').classList.add('on');$('mSt').textContent='Training';break;
   case'training_complete':setSt('ok','Live');$('prg').classList.remove('on');$('mSt').textContent='Ready';if(m.data.history){tD=m.data.history;renderCharts();$('sAcc').textContent=m.data.accuracy+'%';$('epTag').textContent=m.data.epochs+' ep'}break;
   case'training_update':updTr(m.data);break;
@@ -302,128 +336,125 @@ function updPred(d){if(!d){$('pDig').textContent='—';$('pDig').classList.remov
 function updTr(d){$('prgFl').style.width=(d.epoch/d.total_epochs*100)+'%';$('prgEp').textContent=`Epoch ${d.epoch}/${d.total_epochs}`;$('prgAc').textContent=d.accuracy+'%';$('sAcc').textContent=d.accuracy+'%';$('sLoss').textContent=d.test_loss.toFixed(4);tD.accuracy.push(d.accuracy);tD.train_loss.push(d.train_loss);tD.test_loss.push(d.test_loss);renderCharts();$('epTag').textContent=d.epoch+' ep'}
 
 /* ================================================================
-   NEURAL NETWORK — clean: one dot color, one line color,
-   green for predicted path, red for others, default on reset
+   NEURAL NETWORK VIZ
+   - Idle: all dots grey, all lines grey (default color)
+   - Active: dots one color, lines green (predicted path) / red (others)
+   - Reset → back to idle
    ================================================================ */
 const nc=$('netCvs'),nx=nc.getContext('2d');
 const LY=[{n:14},{n:10},{n:12},{n:12},{n:10}];
 
 function resN(){
   const box=nc.parentElement.getBoundingClientRect();
-  const w=box.width,h=250;
+  // Use actual available space, minus header and labels
+  const w=box.width,h=box.height;
   nc.width=w*dpr;nc.height=h*dpr;
   nx.setTransform(dpr,0,0,dpr,0,0);
   nc.style.width=w+'px';nc.style.height=h+'px';
 }
 function nPos(w,h){
-  const px=35,gx=(w-px*2)/(LY.length-1),out=[];
-  for(let l=0;l<LY.length;l++){const x=px+l*gx,n=LY[l].n,gap=Math.min(15,(h-20)/(n+1)),sy=(h-(n-1)*gap)/2,a=[];for(let i=0;i<n;i++)a.push({x,y:sy+i*gap});out.push(a)}return out;
+  const px=30,gx=(w-px*2)/(LY.length-1),out=[];
+  for(let l=0;l<LY.length;l++){const x=px+l*gx,n=LY[l].n,gap=Math.min(16,(h-16)/(n+1)),sy=(h-(n-1)*gap)/2,a=[];for(let i=0;i<n;i++)a.push({x,y:sy+i*gap});out.push(a)}return out;
 }
 
-// DEFAULT state: single color dots, single color lines
 function netIdle(){
   resN();const w=nc.width/dpr,h=nc.height/dpr,pos=nPos(w,h);
   const dotC=css('--n-dot-idle'),lineC=css('--conn-default');
   nx.clearRect(0,0,w,h);
-  // all lines in default color
-  for(let l=0;l<pos.length-1;l++){
-    const step=Math.max(1,Math.floor(pos[l].length*pos[l+1].length/80));let c=0;
+  for(let l=0;l<pos.length-1;l++){const step=Math.max(1,Math.floor(pos[l].length*pos[l+1].length/80));let c=0;
     for(let i=0;i<pos[l].length;i++)for(let j=0;j<pos[l+1].length;j++){if(c++%step)continue;
       nx.beginPath();nx.moveTo(pos[l][i].x,pos[l][i].y);nx.lineTo(pos[l+1][j].x,pos[l+1][j].y);
-      nx.strokeStyle=lineC;nx.lineWidth=.6;nx.stroke()}}
-  // all dots in default color
-  for(const L of pos)for(const n of L){nx.beginPath();nx.arc(n.x,n.y,4,0,Math.PI*2);nx.fillStyle=dotC;nx.fill()}
+      nx.strokeStyle=lineC;nx.lineWidth=.5;nx.stroke()}}
+  for(const L of pos)for(const n of L){nx.beginPath();nx.arc(n.x,n.y,3.5,0,Math.PI*2);nx.fillStyle=dotC;nx.fill()}
 }
 
-// ACTIVE state: green for predicted output connections, red for others
 function drawNet(acts,probs,pred){
   if(!acts||!Object.keys(acts).length)return netIdle();
   resN();const w=nc.width/dpr,h=nc.height/dpr,pos=nPos(w,h);
   const dotC=css('--n-dot');
-  const greenC=css('--conn-active');  // green
-  const redC=css('--conn-inactive');  // red
-  const defaultC=css('--conn-default');
+  const GREEN='#22c55e';  // always green, not from CSS
+  const RED='#ef4444';    // always red
+  const GREY=css('--n-dot-idle');
 
   const A=[Array(LY[0].n).fill(.3),(acts.conv1||[]).slice(0,LY[1].n),(acts.conv2||[]).slice(0,LY[2].n),(acts.fc1||[]).slice(0,LY[3].n),(probs||[]).map(p=>p/100)];
   for(let l=0;l<A.length;l++)while(A[l].length<LY[l].n)A[l].push(0);
-
   nx.clearRect(0,0,w,h);
 
-  // Draw connections: color based on whether they lead to predicted output
+  // Build "predicted path" — trace back from predicted output
+  // Output: only pred neuron. Each prior layer: top N active neurons.
+  const pathNeurons=[];
+  for(let l=0;l<LY.length;l++)pathNeurons.push(new Set());
+  pathNeurons[LY.length-1].add(pred);
+  // For each hidden layer, mark the top 4 most active neurons as "on path"
+  for(let l=LY.length-2;l>=0;l--){
+    const sorted=[...A[l].map((v,i)=>({v,i}))].sort((a,b)=>b.v-a.v);
+    const topN=Math.min(4,sorted.length);
+    for(let k=0;k<topN;k++){if(sorted[k].v>0.15)pathNeurons[l].add(sorted[k].i)}
+  }
+
+  // DRAW CONNECTIONS — red first (background), then green on top
+  // Red (non-predicted) connections
   for(let l=0;l<pos.length-1;l++){
     for(let i=0;i<pos[l].length;i++){
       for(let j=0;j<pos[l+1].length;j++){
-        const str=Math.min(1,(A[l][i]+A[l+1][j])/2);
+        const str=(A[l][i]+A[l+1][j])/2;
         if(str<0.03)continue;
-
-        // Is this connection part of the predicted path?
-        let isPredPath=false;
-        if(l===pos.length-2){
-          // Last hidden → output: green if j==predicted
-          isPredPath=(j===pred);
-        } else if(l===pos.length-3){
-          // Second-to-last: green if neuron is strongly active
-          isPredPath=(A[l][i]>0.3 && A[l+1][j]>0.3);
-        } else {
-          isPredPath=(str>0.35);
-        }
-
+        const srcOn=pathNeurons[l].has(i),dstOn=pathNeurons[l+1].has(j);
+        if(srcOn&&dstOn)continue; // skip green ones, draw later
         nx.beginPath();nx.moveTo(pos[l][i].x,pos[l][i].y);nx.lineTo(pos[l+1][j].x,pos[l+1][j].y);
-
-        if(isPredPath){
-          nx.strokeStyle=greenC;
-          nx.globalAlpha=0.3+str*0.7;
-          nx.lineWidth=0.5+str*2;
-        } else {
-          nx.strokeStyle=redC;
-          nx.globalAlpha=0.08+str*0.15;
-          nx.lineWidth=0.3+str*0.5;
-        }
-        nx.stroke();nx.globalAlpha=1;
+        nx.strokeStyle=RED;nx.globalAlpha=0.05+Math.min(str,0.5)*0.15;nx.lineWidth=0.4;nx.stroke();
+        nx.globalAlpha=1;
+      }
+    }
+  }
+  // Green (predicted path) connections — drawn on top
+  for(let l=0;l<pos.length-1;l++){
+    for(let i=0;i<pos[l].length;i++){
+      for(let j=0;j<pos[l+1].length;j++){
+        const str=(A[l][i]+A[l+1][j])/2;
+        if(str<0.03)continue;
+        const srcOn=pathNeurons[l].has(i),dstOn=pathNeurons[l+1].has(j);
+        if(!srcOn||!dstOn)continue;
+        nx.beginPath();nx.moveTo(pos[l][i].x,pos[l][i].y);nx.lineTo(pos[l+1][j].x,pos[l+1][j].y);
+        nx.strokeStyle=GREEN;nx.globalAlpha=0.3+str*0.6;nx.lineWidth=0.8+str*2;nx.stroke();
+        nx.globalAlpha=1;
       }
     }
   }
 
-  // All dots: single color, size varies by activation
+  // DOTS — all same color (purple/blue), size by activation
   for(let l=0;l<pos.length;l++){
     for(let i=0;i<pos[l].length;i++){
-      const nd=pos[l][i],a=A[l][i]||0;
-      const r=3+a*3;
-
+      const nd=pos[l][i],a=A[l][i]||0,r=3+a*3;
       nx.beginPath();nx.arc(nd.x,nd.y,r,0,Math.PI*2);
-      nx.fillStyle=dotC;
-      nx.globalAlpha=0.3+a*0.7;
-      nx.fill();nx.globalAlpha=1;
+      nx.fillStyle=dotC;nx.globalAlpha=0.3+a*0.7;nx.fill();nx.globalAlpha=1;
 
       // Output labels
       if(l===pos.length-1){
         const ip=i===pred;
-        nx.font=`${ip?700:600} ${ip?11:9}px "JetBrains Mono"`;
-        nx.fillStyle=ip?greenC:css('--t3');
-        nx.textAlign='left';
-        nx.fillText(i+'',nd.x+r+5,nd.y+3);
+        nx.font=`${ip?700:600} ${ip?11:8}px "JetBrains Mono"`;
+        nx.fillStyle=ip?GREEN:css('--t3');nx.textAlign='left';
+        nx.fillText(i+'',nd.x+r+4,nd.y+3);
         if(ip){
-          // Highlight ring
+          // Green ring around predicted
           nx.beginPath();nx.arc(nd.x,nd.y,r+3,0,Math.PI*2);
-          nx.strokeStyle=greenC;nx.lineWidth=2;nx.stroke();
-          nx.font='700 10px "JetBrains Mono"';nx.fillStyle=greenC;
-          nx.fillText(probs[i].toFixed(0)+'%',nd.x+r+18,nd.y+3);
+          nx.strokeStyle=GREEN;nx.lineWidth=2;nx.stroke();
+          nx.font='700 9px "JetBrains Mono"';nx.fillStyle=GREEN;
+          nx.fillText(probs[i].toFixed(0)+'%',nd.x+r+16,nd.y+3);
         }
       }
     }
   }
 }
 
-let animOn=false;
-function startAnim(){/* no continuous animation needed — static green/red is clear */}
-
-// CHARTS
+/* CHARTS — rendered into fixed 180×180 squares */
 let tD={train_loss:[],test_loss:[],accuracy:[]};
 function renderCharts(){rCh('chAcc',tD.accuracy||[],{color:css('--ok'),minY:90,maxY:100,sfx:'%'});rCh('chLoss',tD.train_loss||[],{color:css('--warn'),minY:0,maxY:null,sfx:''})}
 function rCh(id,data,o){
   const cv=$(id),ct=cv.getContext('2d'),r=cv.parentElement.getBoundingClientRect();
-  cv.width=r.width*dpr;cv.height=r.height*dpr;ct.setTransform(dpr,0,0,dpr,0,0);cv.style.width=r.width+'px';cv.style.height=r.height+'px';
-  const w=r.width,h=r.height,pd={t:8,r:8,b:14,l:32},cW=w-pd.l-pd.r,cH=h-pd.t-pd.b;
+  const sz=Math.min(r.width,r.height);
+  cv.width=sz*dpr;cv.height=sz*dpr;ct.setTransform(dpr,0,0,dpr,0,0);cv.style.width=sz+'px';cv.style.height=sz+'px';
+  const w=sz,h=sz,pd={t:8,r:8,b:16,l:32},cW=w-pd.l-pd.r,cH=h-pd.t-pd.b;
   ct.clearRect(0,0,w,h);const tc=css('--t3'),gc=css('--chart-g');
   if(!data.length){ct.font='500 9px "DM Sans"';ct.fillStyle=tc;ct.textAlign='center';ct.fillText('Train to see data',w/2,h/2);return}
   const mn=o.minY??Math.min(...data)*.95,mx=o.maxY??Math.max(...data)*1.05,rn=mx-mn||1;
@@ -436,7 +467,7 @@ function rCh(id,data,o){
   const gd=ct.createLinearGradient(0,pd.t,0,pd.t+cH);gd.addColorStop(0,o.color+'25');gd.addColorStop(1,o.color+'04');ct.fillStyle=gd;ct.fill();
   for(let i=0;i<data.length;i++){const x=pd.l+i*sx,y=pd.t+cH-((data[i]-mn)/rn)*cH;ct.beginPath();ct.arc(x,y,2.5,0,Math.PI*2);ct.fillStyle=o.color;ct.fill()}}
 
-// BUTTONS
+/* BUTTONS */
 $('btnCl').onclick=()=>{clrCvs();lastPD=null;netIdle()};
 $('btnTr').onclick=()=>$('mTrain').classList.add('on');
 $('mCancel').onclick=()=>$('mTrain').classList.remove('on');
@@ -448,7 +479,7 @@ $('mShutNo').onclick=()=>$('mShut').classList.remove('on');
 $('mShutYes').onclick=()=>{$('mShut').classList.remove('on');if(wsOk)ws.send(JSON.stringify({type:'shutdown'}));fetch('/api/shutdown',{method:'POST'}).catch(()=>{});document.body.innerHTML='<div style="display:flex;height:100vh;align-items:center;justify-content:center;font-family:DM Sans,sans-serif;color:#777;font-size:1rem;flex-direction:column;gap:6px"><span style="font-size:1.8rem">✓</span>Server shut down<br><span style="font-size:.75rem;color:#999">Close this tab</span></div>'};
 
 setInterval(()=>{if(wsOk)ws.send(JSON.stringify({type:'ping'}))},15000);
-window.addEventListener('resize',()=>{netIdle();renderCharts()});
+window.addEventListener('resize',()=>{initDr();netIdle();renderCharts()});
 initDr();netIdle();renderCharts();connWS();
 </script>
 </body>
