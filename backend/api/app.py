@@ -60,12 +60,13 @@ async def websocket_endpoint(ws: WebSocket):
     print(f"Client connected. Total: {len(connected_clients)}")
 
     # Send initial state
+    init_history = predictor.saved_history if predictor.model_loaded else training_history
     await ws.send_text(json.dumps({
         'type': 'init',
         'data': {
             'model_loaded': predictor.model_loaded,
             'device': str(device),
-            'training_history': training_history,
+            'training_history': init_history,
         }
     }))
 

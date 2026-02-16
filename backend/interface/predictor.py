@@ -16,6 +16,7 @@ class Predictor:
         self.model = DigitCNN().to(self.device)
         self.model_loaded = False
         self.inference_times = []
+        self.saved_history = {'train_loss': [], 'test_loss': [], 'accuracy': []}
 
         if os.path.exists(model_path):
             self.load_model(model_path)
@@ -29,6 +30,7 @@ class Predictor:
             self.model_loaded = True
             accuracy = checkpoint.get('accuracy', 0)
             epoch = checkpoint.get('epoch', 0)
+            self.saved_history = checkpoint.get('history', {'train_loss': [], 'test_loss': [], 'accuracy': []})
             print(f"Model loaded: epoch {epoch}, accuracy {accuracy:.2f}%")
             return True
         except Exception as e:

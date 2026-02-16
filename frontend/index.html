@@ -4,1335 +4,452 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Digit AI — Live Neural Network</title>
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Sora:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet">
 <style>
-/* ============================================================
-   CSS VARIABLES — LIGHT & DARK THEMES
-   ============================================================ */
-:root {
-  --font-display: 'Sora', sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
-  --radius: 14px;
-  --radius-sm: 8px;
-  --radius-xs: 5px;
-  --transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+:root{--font:'DM Sans',sans-serif;--mono:'JetBrains Mono',monospace;--ease:cubic-bezier(.4,0,.2,1);--t:.2s}
+
+[data-theme="light"]{
+  --bg:#e9ecf0;
+  --surface:#ffffff;--glass-b:#d0d4dc;--glass-sh:0 1px 8px rgba(0,0,0,.06);
+  --inset:#e0e4ea;--border:#c5c9d2;
+  --t1:#0b1120;--t2:#4a5468;--t3:#8892a4;
+  --ac:#5856f0;--ac-g:linear-gradient(135deg,#5856f0,#7e6df5,#a78bfa);
+  --ac-soft:rgba(88,86,240,.09);--ac-glow:rgba(88,86,240,.2);
+  --ok:#0c9e6b;--ok-s:rgba(12,158,107,.08);
+  --warn:#d49000;--warn-s:rgba(212,144,0,.08);
+  --err:#dc3545;--err-s:rgba(220,53,69,.08);
+  --bar:#d0d4dc;
+  --n-dot:#5856f0;--n-dot-idle:#9ca3b4;
+  --conn-default:#c8ccd6;--conn-active:#22c55e;--conn-inactive:#ef4444;
+  --chart-g:rgba(0,0,0,.06);
+}
+[data-theme="dark"]{
+  --bg:#070a10;
+  --surface:#0f1219;--glass-b:#252b37;--glass-sh:0 1px 8px rgba(0,0,0,.4);
+  --inset:#0a0d15;--border:#2a3040;
+  --t1:#e4e9f2;--t2:#8a93a6;--t3:#4e5668;
+  --ac:#7274f9;--ac-g:linear-gradient(135deg,#6366f1,#8b7cf8,#c084fc);
+  --ac-soft:rgba(99,102,241,.1);--ac-glow:rgba(99,102,241,.22);
+  --ok:#34d399;--ok-s:rgba(52,211,153,.08);
+  --warn:#fbbf24;--warn-s:rgba(251,191,36,.08);
+  --err:#f87171;--err-s:rgba(248,113,113,.08);
+  --bar:#1e2430;
+  --n-dot:#818cf8;--n-dot-idle:#3e4556;
+  --conn-default:#252b37;--conn-active:#22c55e;--conn-inactive:#dc2626;
+  --chart-g:rgba(255,255,255,.04);
 }
 
-[data-theme="light"] {
-  --bg-base: #f0f2f5;
-  --bg-surface: #ffffff;
-  --bg-surface-hover: #f8f9fb;
-  --bg-elevated: #ffffff;
-  --bg-inset: #e8ebef;
-  --border: #d8dce3;
-  --border-subtle: #e8ebef;
-  --text-primary: #0d1117;
-  --text-secondary: #525a65;
-  --text-muted: #8b929c;
-  --text-on-accent: #ffffff;
-  --accent: #4f46e5;
-  --accent-hover: #4338ca;
-  --accent-soft: rgba(79, 70, 229, 0.1);
-  --accent-glow: rgba(79, 70, 229, 0.25);
-  --success: #059669;
-  --success-soft: rgba(5, 150, 105, 0.1);
-  --warning: #d97706;
-  --warning-soft: rgba(217, 119, 6, 0.1);
-  --error: #dc2626;
-  --error-soft: rgba(220, 38, 38, 0.1);
-  --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
-  --shadow-md: 0 4px 16px rgba(0,0,0,0.08);
-  --shadow-lg: 0 12px 40px rgba(0,0,0,0.1);
-  --shadow-glow: 0 0 30px rgba(79, 70, 229, 0.15);
-  --canvas-bg: #f8f9fb;
-  --canvas-grid: #e0e3e8;
-  --chart-grid: rgba(0,0,0,0.06);
-  --network-bg: linear-gradient(135deg, #f8f9fb 0%, #eef0f4 100%);
-  --neuron-idle: #d1d5db;
-  --neuron-active: #4f46e5;
-  --connection-idle: rgba(0,0,0,0.04);
-  --connection-active: rgba(79, 70, 229, 0.5);
-  --bar-bg: #e8ebef;
-  --logo-gradient: linear-gradient(135deg, #4f46e5, #7c3aed, #a855f7);
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden}
+body{font-family:var(--font);background:var(--bg);color:var(--t1);-webkit-font-smoothing:antialiased;transition:background var(--t),color var(--t)}
+
+/* PAGE */
+.page{height:100vh;display:flex;flex-direction:column;max-width:1440px;margin:0 auto;padding:10px 20px 6px}
+
+/* HEADER */
+.hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-shrink:0}
+.logo{display:flex;align-items:center;gap:6px}
+.logo-i{width:28px;height:28px;border-radius:7px;background:var(--ac-g);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:700;font-size:.65rem;color:#fff;box-shadow:0 2px 8px var(--ac-glow)}
+.logo-t{font-size:1.05rem;font-weight:700;letter-spacing:-.02em;background:var(--ac-g);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hdr-r{display:flex;align-items:center;gap:8px}
+.pill{display:flex;align-items:center;gap:4px;padding:3px 8px;border-radius:12px;font-size:.6rem;font-weight:600}
+.pill-ok{background:var(--ok-s);color:var(--ok)}.pill-off{background:var(--err-s);color:var(--err)}.pill-tr{background:var(--warn-s);color:var(--warn)}
+.dot{width:5px;height:5px;border-radius:50%;background:currentColor;animation:pls 2s ease-in-out infinite}
+@keyframes pls{0%,100%{opacity:1}50%{opacity:.3}}
+.th{width:36px;height:18px;border-radius:9px;border:1px solid var(--border);background:var(--inset);cursor:pointer;position:relative;transition:background var(--t)}
+.th::after{content:'';position:absolute;top:1.5px;left:1.5px;width:13px;height:13px;border-radius:50%;background:var(--ac);transition:transform var(--t);box-shadow:0 1px 3px rgba(0,0,0,.25)}
+[data-theme="dark"] .th::after{transform:translateX(18px)}
+.th .i{position:absolute;top:1px;font-size:9px;line-height:16px}.th .i.s{left:3px}.th .i.m{right:3px}
+.hdr-btn{padding:3px 8px;border-radius:5px;border:1px solid var(--border);background:var(--surface);color:var(--err);font-family:var(--font);font-size:.6rem;font-weight:600;cursor:pointer;transition:all var(--t);display:flex;align-items:center;gap:3px}
+.hdr-btn:hover{background:var(--err-s);border-color:var(--err)}
+.hdr-btn svg{width:10px;height:10px}
+
+/* GRID */
+.grid{
+  flex:1;min-height:0;
+  display:grid;
+  grid-template-columns:250px 1fr 220px;
+  grid-template-rows:1fr auto;
+  gap:10px;
+  overflow:hidden;
 }
 
-[data-theme="dark"] {
-  --bg-base: #0b0e14;
-  --bg-surface: #141820;
-  --bg-surface-hover: #1a1f2b;
-  --bg-elevated: #1a1f2b;
-  --bg-inset: #0f1219;
-  --border: #252b37;
-  --border-subtle: #1e2430;
-  --text-primary: #e6eaf0;
-  --text-secondary: #8b929c;
-  --text-muted: #5c6370;
-  --text-on-accent: #ffffff;
-  --accent: #6366f1;
-  --accent-hover: #818cf8;
-  --accent-soft: rgba(99, 102, 241, 0.12);
-  --accent-glow: rgba(99, 102, 241, 0.3);
-  --success: #34d399;
-  --success-soft: rgba(52, 211, 153, 0.12);
-  --warning: #fbbf24;
-  --warning-soft: rgba(251, 191, 36, 0.12);
-  --error: #f87171;
-  --error-soft: rgba(248, 113, 113, 0.12);
-  --shadow-sm: 0 1px 3px rgba(0,0,0,0.3);
-  --shadow-md: 0 4px 16px rgba(0,0,0,0.4);
-  --shadow-lg: 0 12px 40px rgba(0,0,0,0.5);
-  --shadow-glow: 0 0 40px rgba(99, 102, 241, 0.2);
-  --canvas-bg: #0f1219;
-  --canvas-grid: #1e2430;
-  --chart-grid: rgba(255,255,255,0.04);
-  --network-bg: linear-gradient(135deg, #0f1219 0%, #141820 100%);
-  --neuron-idle: #2a3040;
-  --neuron-active: #6366f1;
-  --connection-idle: rgba(255,255,255,0.03);
-  --connection-active: rgba(99, 102, 241, 0.5);
-  --bar-bg: #1e2430;
-  --logo-gradient: linear-gradient(135deg, #6366f1, #a78bfa, #c084fc);
+/* CARD — solid bg, visible border */
+.c{
+  background:var(--surface);
+  border:1.5px solid var(--glass-b);border-radius:10px;
+  box-shadow:var(--glass-sh);padding:10px;
+  transition:background var(--t),border-color var(--t);
 }
+.c-h{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.c-t{font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--t3)}
+.tag{font-family:var(--mono);font-size:.5rem;padding:1px 5px;border-radius:3px;background:var(--ac-soft);color:var(--ac);font-weight:700}
 
-/* ============================================================
-   RESET & BASE
-   ============================================================ */
-*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+/* R1C1: DRAW — bigger */
+.draw-cell{grid-row:1;grid-column:1;display:flex;flex-direction:column}
+.cvs-w{
+  width:228px;height:228px;
+  background:#000;border-radius:7px;border:1.5px solid var(--border);
+  overflow:hidden;cursor:crosshair;position:relative;
+}
+#drawCanvas{width:100%;height:100%;display:block;touch-action:none}
+.cvs-w::after{content:'';position:absolute;inset:0;pointer-events:none;
+  background-image:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px);
+  background-size:calc(100%/28) calc(100%/28)}
 
-body {
-  font-family: var(--font-display);
-  background: var(--bg-base);
-  color: var(--text-primary);
-  min-height: 100vh;
-  line-height: 1.5;
-  -webkit-font-smoothing: antialiased;
-  transition: background var(--transition), color var(--transition);
+/* R1C2: NETWORK — fixed 300px */
+.net-cell{
+  grid-row:1;grid-column:2;
+  height:300px;
+  display:flex;flex-direction:column;
+  background:var(--surface);border:1.5px solid var(--glass-b);border-radius:10px;box-shadow:var(--glass-sh);
+  transition:background var(--t),border-color var(--t);overflow:hidden;
 }
+.net-top{display:flex;justify-content:space-between;align-items:center;padding:8px 12px 0;flex-shrink:0}
+#netCvs{flex:1;width:100%;display:block;min-height:0}
+.net-lbl{display:flex;justify-content:space-between;padding:4px 20px 8px;flex-shrink:0;font-size:.5rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--t3)}
 
-/* ============================================================
-   LAYOUT
-   ============================================================ */
-.app { max-width: 1280px; margin: 0 auto; padding: 1.25rem; }
+/* R1C3: ACCURACY — square */
+.acc-cell{grid-row:1;grid-column:3;display:flex;flex-direction:column}
+.ch-area{flex:1;min-height:0;position:relative;aspect-ratio:1}
+.ch-area canvas{width:100%!important;height:100%!important;display:block}
 
-.header {
-  display: flex; justify-content: space-between; align-items: center;
-  padding: 0.75rem 0; margin-bottom: 1.5rem;
-}
+/* R2C1: BUTTONS+PRED — bigger */
+.bot-left{grid-row:2;grid-column:1;display:flex;flex-direction:column;gap:8px}
+.btns{display:flex;gap:5px}
+.b{flex:1;padding:7px;border:1.5px solid var(--border);border-radius:6px;background:var(--surface);color:var(--t1);font-family:var(--font);font-size:.65rem;font-weight:600;cursor:pointer;transition:all var(--t);display:flex;align-items:center;justify-content:center;gap:3px}
+.b:hover{border-color:var(--ac);background:var(--ac-soft)}.b svg{width:11px;height:11px}
+.b-a{background:var(--ac);color:#fff;border-color:var(--ac)}.b-a:hover{filter:brightness(1.1)}
+.b-d{color:var(--err)}.b-d:hover{background:var(--err-s);border-color:var(--err)}
 
-.logo { display: flex; align-items: center; gap: 0.6rem; }
+.pred{display:flex;align-items:center;gap:10px;margin-top:6px}
+.pred-d{width:50px;height:50px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:1.8rem;font-weight:700;color:var(--ac);background:var(--ac-soft);border-radius:8px;border:2px solid transparent;transition:all .25s}
+.pred-d.on{border-color:var(--ac);box-shadow:0 0 14px var(--ac-glow)}
+.pred-i .lb{font-size:.52rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--t3)}
+.pred-i .cv{font-family:var(--mono);font-size:1.15rem;font-weight:700}
+.pred-i .ms{font-family:var(--mono);font-size:.58rem;color:var(--t3)}
 
-.logo-mark {
-  width: 36px; height: 36px; border-radius: 10px;
-  background: var(--logo-gradient);
-  display: flex; align-items: center; justify-content: center;
-  font-family: var(--font-mono); font-weight: 700; font-size: 0.9rem;
-  color: #fff; box-shadow: 0 2px 12px rgba(99, 102, 241, 0.3);
-}
+.sts{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:6px}
+.st{padding:5px 6px;background:var(--inset);border-radius:5px;border:1.5px solid var(--border)}
+.st-l{font-size:.48rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--t3)}
+.st-v{font-family:var(--mono);font-size:.75rem;font-weight:700}
+.c-ok{color:var(--ok)}.c-ac{color:var(--ac)}.c-w{color:var(--warn)}
 
-.logo-text {
-  font-size: 1.3rem; font-weight: 700; letter-spacing: -0.03em;
-  background: var(--logo-gradient);
-  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
+.prg{display:none;margin-top:5px}.prg.on{display:block}
+.prg-tr{width:100%;height:4px;background:var(--bar);border-radius:2px;overflow:hidden;margin-bottom:3px}
+.prg-fl{height:100%;background:var(--ac-g);border-radius:2px;width:0%;transition:width .4s}
+.prg-t{display:flex;justify-content:space-between;font-family:var(--mono);font-size:.52rem;color:var(--t3)}
 
-.header-controls { display: flex; align-items: center; gap: 0.75rem; }
+/* R2C2: CONFIDENCE */
+.conf-cell{grid-row:2;grid-column:2}
+.cb{display:flex;flex-direction:column;gap:3px}
+.cr{display:flex;align-items:center;gap:5px;height:22px}
+.cr-l{font-family:var(--mono);font-size:.62rem;font-weight:700;width:12px;text-align:center;color:var(--t3)}
+.cr-tk{flex:1;height:16px;background:var(--bar);border-radius:3px;overflow:hidden}
+.cr-fl{height:100%;border-radius:3px;background:var(--ac);opacity:.35;width:0%;transition:width .1s,opacity .1s}
+.cr-fl.hit{opacity:1;background:var(--ac-g);box-shadow:0 0 6px var(--ac-glow)}
+.cr-v{font-family:var(--mono);font-size:.58rem;font-weight:600;width:38px;text-align:right;color:var(--t3);transition:color .1s}
+.cr-v.hit{color:var(--ac);font-weight:700}
 
-/* Theme Toggle */
-.theme-toggle {
-  width: 44px; height: 24px; border-radius: 12px; border: none;
-  background: var(--bg-inset); cursor: pointer; position: relative;
-  transition: background var(--transition);
-  border: 1px solid var(--border-subtle);
-}
-.theme-toggle::after {
-  content: ''; position: absolute; top: 2px; left: 2px;
-  width: 18px; height: 18px; border-radius: 50%;
-  background: var(--accent); transition: transform var(--transition);
-  box-shadow: 0 1px 4px rgba(0,0,0,0.2);
-}
-[data-theme="dark"] .theme-toggle::after { transform: translateX(20px); }
-.theme-icon { position: absolute; top: 3px; font-size: 12px; line-height: 18px; }
-.theme-icon.sun { left: 5px; }
-.theme-icon.moon { right: 5px; }
+/* R2C3: LOSS — square */
+.loss-cell{grid-row:2;grid-column:3;display:flex;flex-direction:column}
 
-/* Status Pill */
-.status-pill {
-  display: flex; align-items: center; gap: 0.4rem;
-  padding: 0.3rem 0.75rem; border-radius: 20px;
-  background: var(--success-soft); font-size: 0.75rem;
-  font-weight: 500; color: var(--success);
-}
-.status-pill.offline { background: var(--error-soft); color: var(--error); }
-.status-pill.training { background: var(--warning-soft); color: var(--warning); }
-.status-dot {
-  width: 6px; height: 6px; border-radius: 50%;
-  background: currentColor; animation: pulse 2s ease-in-out infinite;
-}
-@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+/* FOOTER */
+.ftr{flex-shrink:0;display:flex;justify-content:space-between;padding:4px 0 0;font-family:var(--mono);font-size:.5rem;color:var(--t3)}
 
-/* ============================================================
-   CARDS
-   ============================================================ */
-.card {
-  background: var(--bg-surface); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 1.25rem;
-  box-shadow: var(--shadow-sm);
-  transition: background var(--transition), border-color var(--transition), box-shadow var(--transition);
-}
-.card-header {
-  display: flex; justify-content: space-between; align-items: center;
-  margin-bottom: 1rem;
-}
-.card-title {
-  font-size: 0.85rem; font-weight: 600; text-transform: uppercase;
-  letter-spacing: 0.06em; color: var(--text-muted);
-}
-.card-badge {
-  font-family: var(--font-mono); font-size: 0.7rem; padding: 0.15rem 0.5rem;
-  border-radius: 4px; background: var(--accent-soft); color: var(--accent);
-  font-weight: 600;
-}
+/* MODALS */
+.mo{display:none;position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.5);backdrop-filter:blur(5px);align-items:center;justify-content:center}
+.mo.on{display:flex}
+.mo-b{background:var(--surface);border:1.5px solid var(--glass-b);border-radius:12px;padding:20px;max-width:360px;width:90%;box-shadow:0 16px 50px rgba(0,0,0,.4)}
+.mo-b h2{font-size:.95rem;font-weight:700;margin-bottom:4px}
+.mo-b p{color:var(--t2);font-size:.78rem;margin-bottom:12px}
+.sl-g{margin-bottom:12px}
+.sl-g label{display:flex;justify-content:space-between;font-size:.72rem;font-weight:500;margin-bottom:4px}
+.sl-g label span{font-family:var(--mono);color:var(--ac)}
+input[type=range]{width:100%;height:3px;-webkit-appearance:none;background:var(--bar);border-radius:2px;outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;border-radius:50%;background:var(--ac);cursor:pointer;box-shadow:0 0 6px var(--ac-glow)}
+.mo-btn{display:flex;gap:6px}.mo-btn .b{flex:1;padding:7px}
 
-/* ============================================================
-   SECTION: TITLE
-   ============================================================ */
-.section-title {
-  text-align: center; margin-bottom: 1.5rem;
-}
-.section-title h1 {
-  font-size: 1.6rem; font-weight: 700; letter-spacing: -0.03em;
-}
-.section-title p {
-  color: var(--text-secondary); font-size: 0.9rem; margin-top: 0.25rem;
-}
-
-/* ============================================================
-   NEURAL NETWORK VISUALIZATION
-   ============================================================ */
-.network-card {
-  padding: 1.5rem; margin-bottom: 1.5rem;
-  background: var(--network-bg); overflow: hidden;
-  position: relative;
-}
-.network-card::before {
-  content: ''; position: absolute; inset: 0; pointer-events: none;
-  background: radial-gradient(ellipse at 50% 50%, var(--accent-glow), transparent 70%);
-  opacity: 0; transition: opacity 0.5s;
-}
-.network-card.active::before { opacity: 1; }
-
-#networkCanvas {
-  width: 100%; height: 220px; display: block;
-}
-
-.network-labels {
-  display: flex; justify-content: space-between; padding: 0.75rem 2rem 0;
-}
-.network-label {
-  font-size: 0.7rem; font-weight: 600; text-transform: uppercase;
-  letter-spacing: 0.08em; color: var(--text-muted);
-}
-
-/* ============================================================
-   MAIN GRID
-   ============================================================ */
-.main-grid {
-  display: grid; grid-template-columns: 340px 1fr;
-  gap: 1.5rem; align-items: start;
-}
-
-@media (max-width: 900px) {
-  .main-grid { grid-template-columns: 1fr; }
-}
-
-/* ============================================================
-   DRAWING CANVAS
-   ============================================================ */
-.canvas-area { display: flex; flex-direction: column; gap: 1rem; }
-
-.canvas-wrapper {
-  position: relative; aspect-ratio: 1; width: 100%;
-  background: #000000; border-radius: var(--radius-sm);
-  border: 2px solid var(--border); overflow: hidden;
-  cursor: crosshair;
-}
-
-#drawCanvas {
-  width: 100%; height: 100%; display: block;
-  touch-action: none;
-}
-
-/* Grid overlay */
-.canvas-wrapper::after {
-  content: ''; position: absolute; inset: 0; pointer-events: none;
-  background-image:
-    linear-gradient(rgba(255,255,255,0.06) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,0.06) 1px, transparent 1px);
-  background-size: calc(100%/28) calc(100%/28);
-  opacity: 0.8;
-}
-
-.canvas-buttons {
-  display: flex; gap: 0.5rem;
-}
-
-.btn {
-  flex: 1; padding: 0.6rem 1rem; border: 1px solid var(--border);
-  border-radius: var(--radius-sm); background: var(--bg-surface);
-  color: var(--text-primary); font-family: var(--font-display);
-  font-size: 0.8rem; font-weight: 500; cursor: pointer;
-  transition: all var(--transition); display: flex;
-  align-items: center; justify-content: center; gap: 0.4rem;
-}
-.btn:hover { background: var(--bg-surface-hover); border-color: var(--accent); }
-.btn-accent {
-  background: var(--accent); color: var(--text-on-accent);
-  border-color: var(--accent);
-}
-.btn-accent:hover { background: var(--accent-hover); }
-.btn-danger { color: var(--error); }
-.btn-danger:hover { background: var(--error-soft); border-color: var(--error); }
-
-.btn svg { width: 14px; height: 14px; }
-
-/* ============================================================
-   PREDICTION HERO
-   ============================================================ */
-.prediction-hero {
-  display: flex; align-items: center; gap: 1rem;
-  padding: 1rem; background: var(--bg-inset);
-  border-radius: var(--radius-sm); border: 1px solid var(--border-subtle);
-}
-.predicted-digit {
-  width: 64px; height: 64px; display: flex;
-  align-items: center; justify-content: center;
-  font-family: var(--font-mono); font-size: 2.4rem; font-weight: 700;
-  color: var(--accent); background: var(--accent-soft);
-  border-radius: var(--radius-sm); transition: all 0.3s;
-  border: 2px solid transparent;
-}
-.predicted-digit.active {
-  border-color: var(--accent);
-  box-shadow: 0 0 20px var(--accent-glow);
-}
-.prediction-meta { flex: 1; }
-.prediction-meta .label {
-  font-size: 0.7rem; font-weight: 600; text-transform: uppercase;
-  letter-spacing: 0.06em; color: var(--text-muted);
-}
-.prediction-meta .confidence {
-  font-family: var(--font-mono); font-size: 1.5rem; font-weight: 700;
-}
-.prediction-meta .inference-time {
-  font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-muted);
-}
-
-/* ============================================================
-   TRAINING STATUS
-   ============================================================ */
-.training-stats {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;
-}
-.stat-box {
-  padding: 0.6rem; background: var(--bg-inset);
-  border-radius: var(--radius-xs); border: 1px solid var(--border-subtle);
-}
-.stat-box .stat-label {
-  font-size: 0.65rem; font-weight: 600; text-transform: uppercase;
-  letter-spacing: 0.06em; color: var(--text-muted); margin-bottom: 0.15rem;
-}
-.stat-box .stat-value {
-  font-family: var(--font-mono); font-size: 1rem; font-weight: 600;
-}
-.stat-box .stat-value.success { color: var(--success); }
-.stat-box .stat-value.accent { color: var(--accent); }
-.stat-box .stat-value.warning { color: var(--warning); }
-
-/* ============================================================
-   RIGHT COLUMN: LIVE METRICS
-   ============================================================ */
-.right-col { display: flex; flex-direction: column; gap: 1.5rem; }
-
-/* Charts */
-.charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-@media (max-width: 700px) { .charts-grid { grid-template-columns: 1fr; } }
-
-.chart-container {
-  aspect-ratio: 2/1; position: relative;
-}
-.chart-container canvas { width: 100% !important; height: 100% !important; }
-
-/* Confidence Bars */
-.confidence-bars { display: flex; flex-direction: column; gap: 0.4rem; }
-
-.conf-row {
-  display: flex; align-items: center; gap: 0.5rem;
-  height: 28px;
-}
-.conf-label {
-  font-family: var(--font-mono); font-size: 0.75rem; font-weight: 600;
-  width: 16px; text-align: center; color: var(--text-muted);
-}
-.conf-bar-track {
-  flex: 1; height: 22px; background: var(--bar-bg);
-  border-radius: 4px; overflow: hidden; position: relative;
-}
-.conf-bar-fill {
-  height: 100%; border-radius: 4px;
-  background: var(--accent); opacity: 0.5;
-  width: 0%; transition: width 0.15s ease-out, opacity 0.15s;
-}
-.conf-bar-fill.predicted {
-  opacity: 1;
-  background: linear-gradient(90deg, var(--accent), var(--accent-hover));
-  box-shadow: 0 0 8px var(--accent-glow);
-}
-.conf-value {
-  font-family: var(--font-mono); font-size: 0.7rem; font-weight: 600;
-  width: 44px; text-align: right; color: var(--text-muted);
-  transition: color 0.15s;
-}
-.conf-value.predicted { color: var(--accent); font-weight: 700; }
-
-/* ============================================================
-   STATUS BAR
-   ============================================================ */
-.status-bar {
-  font-family: var(--font-mono); font-size: 0.7rem;
-  color: var(--text-muted); padding: 0.5rem 0;
-  display: flex; justify-content: space-between;
-}
-
-/* ============================================================
-   TRAINING MODAL
-   ============================================================ */
-.modal-overlay {
-  display: none; position: fixed; inset: 0; z-index: 100;
-  background: rgba(0,0,0,0.5); backdrop-filter: blur(4px);
-  align-items: center; justify-content: center;
-}
-.modal-overlay.show { display: flex; }
-.modal {
-  background: var(--bg-surface); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 2rem; max-width: 420px;
-  width: 90%; box-shadow: var(--shadow-lg);
-}
-.modal h2 {
-  font-size: 1.1rem; font-weight: 700; margin-bottom: 0.5rem;
-}
-.modal p { color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 1.25rem; }
-
-.epoch-slider-group { margin-bottom: 1.25rem; }
-.epoch-slider-group label {
-  display: flex; justify-content: space-between;
-  font-size: 0.8rem; font-weight: 500; margin-bottom: 0.4rem;
-}
-.epoch-slider-group label span { font-family: var(--font-mono); color: var(--accent); }
-input[type="range"] {
-  width: 100%; height: 4px; -webkit-appearance: none;
-  background: var(--bar-bg); border-radius: 2px; outline: none;
-}
-input[type="range"]::-webkit-slider-thumb {
-  -webkit-appearance: none; width: 16px; height: 16px;
-  border-radius: 50%; background: var(--accent); cursor: pointer;
-  box-shadow: 0 0 6px var(--accent-glow);
-}
-
-.modal-buttons { display: flex; gap: 0.5rem; }
-.modal-buttons .btn { flex: 1; }
-
-/* ============================================================
-   TRAINING PROGRESS OVERLAY
-   ============================================================ */
-.training-progress {
-  display: none; margin-top: 0.75rem;
-}
-.training-progress.show { display: block; }
-.progress-track {
-  width: 100%; height: 6px; background: var(--bar-bg);
-  border-radius: 3px; overflow: hidden; margin-bottom: 0.4rem;
-}
-.progress-fill {
-  height: 100%; background: var(--accent); border-radius: 3px;
-  width: 0%; transition: width 0.5s;
-}
-.progress-text {
-  font-family: var(--font-mono); font-size: 0.7rem;
-  color: var(--text-secondary); display: flex;
-  justify-content: space-between;
-}
-
-/* ============================================================
-   SCROLLBAR
-   ============================================================ */
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-
-/* ============================================================
-   ANIMATIONS
-   ============================================================ */
-@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-.fade-in { animation: fadeIn 0.4s ease-out forwards; }
+@media(max-width:900px){.grid{grid-template-columns:1fr;grid-template-rows:repeat(6,auto)}.draw-cell,.net-cell,.acc-cell,.bot-left,.conf-cell,.loss-cell{grid-row:auto;grid-column:1}.net-cell{height:auto}html,body{overflow:auto}}
 </style>
 </head>
 <body>
-
-<div class="app">
-  <!-- HEADER -->
-  <header class="header">
-    <div class="logo">
-      <div class="logo-mark">AI</div>
-      <span class="logo-text">Digit AI</span>
-    </div>
-    <div class="header-controls">
-      <div class="status-pill" id="statusPill">
-        <span class="status-dot"></span>
-        <span id="statusText">Connecting...</span>
-      </div>
-      <button class="theme-toggle" id="themeToggle" title="Toggle theme">
-        <span class="theme-icon sun">☀</span>
-        <span class="theme-icon moon">☾</span>
-      </button>
-    </div>
-  </header>
-
-  <!-- TITLE -->
-  <div class="section-title">
-    <h1>Live Neural Network Visualization</h1>
-    <p>Draw a digit and watch the network think in real time</p>
+<div class="page">
+<header class="hdr">
+  <div class="logo"><div class="logo-i">AI</div><span class="logo-t">Digit AI</span></div>
+  <div class="hdr-r">
+    <div class="pill pill-ok" id="sPill"><span class="dot"></span><span id="sTxt">Connecting</span></div>
+    <button class="th" id="thBtn" title="Toggle theme"><span class="i s">☀</span><span class="i m">☾</span></button>
+    <button class="hdr-btn" id="btnOff"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>Close</button>
   </div>
-
-  <!-- NEURAL NETWORK VIZ -->
-  <div class="card network-card" id="networkCard">
-    <canvas id="networkCanvas"></canvas>
-    <div class="network-labels">
-      <span class="network-label">Input Layer</span>
-      <span class="network-label">Conv → FC Hidden</span>
-      <span class="network-label">Output (0–9)</span>
-    </div>
+</header>
+<div class="grid">
+  <div class="c draw-cell">
+    <div class="c-h"><span class="c-t">Draw</span><span class="tag">28×28</span></div>
+    <div class="cvs-w"><canvas id="drawCanvas"></canvas></div>
   </div>
-
-  <!-- MAIN GRID -->
-  <div class="main-grid">
-    <!-- LEFT: Canvas & Controls -->
-    <div class="canvas-area">
-      <!-- Drawing Canvas -->
-      <div class="card">
-        <div class="card-header">
-          <span class="card-title">Drawing Canvas</span>
-          <span class="card-badge">28×28</span>
-        </div>
-        <div class="canvas-wrapper">
-          <canvas id="drawCanvas"></canvas>
-        </div>
-        <div class="canvas-buttons" style="margin-top:0.75rem">
-          <button class="btn" id="btnClear">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a1 1 0 011-1h6a1 1 0 011 1v2m2 0v12a2 2 0 01-2 2H8a2 2 0 01-2-2V6h12z"/></svg>
-            Clear
-          </button>
-          <button class="btn btn-accent" id="btnTrain">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-            Train Model
-          </button>
-          <button class="btn btn-danger" id="btnReset">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 4v6h6M23 20v-6h-6"/><path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15"/></svg>
-            Reset
-          </button>
-        </div>
-      </div>
-
-      <!-- Prediction Hero -->
-      <div class="card">
-        <div class="card-header">
-          <span class="card-title">Prediction</span>
-          <span class="card-badge" id="modelStatus">No Model</span>
-        </div>
-        <div class="prediction-hero">
-          <div class="predicted-digit" id="predictedDigit">—</div>
-          <div class="prediction-meta">
-            <div class="label">Confidence</div>
-            <div class="confidence" id="confidenceValue">0.0%</div>
-            <div class="inference-time" id="inferenceTime">—</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Training Stats -->
-      <div class="card">
-        <div class="card-header">
-          <span class="card-title">System Status</span>
-        </div>
-        <div class="training-stats">
-          <div class="stat-box">
-            <div class="stat-label">Accuracy</div>
-            <div class="stat-value success" id="statAccuracy">—</div>
-          </div>
-          <div class="stat-box">
-            <div class="stat-label">Inference</div>
-            <div class="stat-value accent" id="statInference">—</div>
-          </div>
-          <div class="stat-box">
-            <div class="stat-label">Loss</div>
-            <div class="stat-value warning" id="statLoss">—</div>
-          </div>
-          <div class="stat-box">
-            <div class="stat-label">Device</div>
-            <div class="stat-value" id="statDevice">—</div>
-          </div>
-        </div>
-        <div class="training-progress" id="trainingProgress">
-          <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
-          <div class="progress-text">
-            <span id="progressEpoch">Epoch 0/0</span>
-            <span id="progressAcc">0%</span>
-          </div>
-        </div>
-      </div>
+  <div class="net-cell" id="netCard">
+    <div class="net-top"><span class="c-t">Neural Network Diagram</span><span class="tag">CNN</span></div>
+    <canvas id="netCvs"></canvas>
+    <div class="net-lbl"><span>Input</span><span>Conv1</span><span>Conv2</span><span>Dense</span><span>Output 0–9</span></div>
+  </div>
+  <div class="c acc-cell">
+    <div class="c-h"><span class="c-t">Accuracy</span><span class="tag" id="epTag">0 ep</span></div>
+    <div class="ch-area"><canvas id="chAcc"></canvas></div>
+  </div>
+  <div class="bot-left">
+    <div class="btns">
+      <button class="b" id="btnCl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a1 1 0 011-1h6a1 1 0 011 1v2m2 0v12a2 2 0 01-2 2H8a2 2 0 01-2-2V6h12z"/></svg>Clear</button>
+      <button class="b b-a" id="btnTr"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>Train</button>
+      <button class="b b-d" id="btnRs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 4v6h6M23 20v-6h-6"/><path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15"/></svg>Reset</button>
     </div>
-
-    <!-- RIGHT: Live Metrics -->
-    <div class="right-col">
-      <!-- Charts -->
-      <div class="card">
-        <div class="card-header">
-          <span class="card-title">Training Metrics</span>
-          <span class="card-badge" id="epochBadge">0 Epochs</span>
-        </div>
-        <div class="charts-grid">
-          <div>
-            <div style="font-size:0.7rem;font-weight:600;color:var(--text-muted);margin-bottom:0.4rem;text-transform:uppercase;letter-spacing:0.05em;">Accuracy (%)</div>
-            <div class="chart-container"><canvas id="chartAccuracy"></canvas></div>
-          </div>
-          <div>
-            <div style="font-size:0.7rem;font-weight:600;color:var(--text-muted);margin-bottom:0.4rem;text-transform:uppercase;letter-spacing:0.05em;">Loss</div>
-            <div class="chart-container"><canvas id="chartLoss"></canvas></div>
-          </div>
-        </div>
+    <div class="c">
+      <div class="c-h"><span class="c-t">Prediction</span><span class="tag" id="mSt">No Model</span></div>
+      <div class="pred">
+        <div class="pred-d" id="pDig">—</div>
+        <div class="pred-i"><div class="lb">Confidence</div><div class="cv" id="pConf">0.0%</div><div class="ms" id="pMs">—</div></div>
       </div>
-
-      <!-- Confidence Bars -->
-      <div class="card">
-        <div class="card-header">
-          <span class="card-title">Prediction Confidence</span>
-          <span class="card-badge">Real-Time</span>
-        </div>
-        <div class="confidence-bars" id="confidenceBars"></div>
+      <div class="sts">
+        <div class="st"><div class="st-l">Accuracy</div><div class="st-v c-ok" id="sAcc">—</div></div>
+        <div class="st"><div class="st-l">Inference</div><div class="st-v c-ac" id="sInf">—</div></div>
+        <div class="st"><div class="st-l">Loss</div><div class="st-v c-w" id="sLoss">—</div></div>
+        <div class="st"><div class="st-l">Device</div><div class="st-v" id="sDev">—</div></div>
       </div>
+      <div class="prg" id="prg"><div class="prg-tr"><div class="prg-fl" id="prgFl"></div></div><div class="prg-t"><span id="prgEp">Epoch 0/0</span><span id="prgAc">0%</span></div></div>
     </div>
   </div>
-
-  <!-- Status Bar -->
-  <div class="status-bar">
-    <span id="footerStatus">Status: Waiting for connection...</span>
-    <span id="footerFPS">0 FPS</span>
+  <div class="c conf-cell">
+    <div class="c-h"><span class="c-t">Confidence</span><span class="tag">Real-Time</span></div>
+    <div class="cb" id="cBars"></div>
+  </div>
+  <div class="c loss-cell">
+    <div class="c-h"><span class="c-t">Loss</span></div>
+    <div class="ch-area"><canvas id="chLoss"></canvas></div>
   </div>
 </div>
-
-<!-- TRAINING MODAL -->
-<div class="modal-overlay" id="trainModal">
-  <div class="modal">
-    <h2>Train Neural Network</h2>
-    <p>This will download MNIST data (~12MB on first run) and train a CNN. Your 5070 Ti should handle this in a few minutes.</p>
-    <div class="epoch-slider-group">
-      <label>Epochs <span id="epochCount">15</span></label>
-      <input type="range" id="epochSlider" min="5" max="30" value="15" step="1">
-    </div>
-    <div class="modal-buttons">
-      <button class="btn" id="modalCancel">Cancel</button>
-      <button class="btn btn-accent" id="modalStart">Start Training</button>
-    </div>
-  </div>
+<div class="ftr"><span id="fSt">Connecting...</span><span id="fFps">— FPS</span></div>
 </div>
+
+<div class="mo" id="mTrain"><div class="mo-b"><h2>Train Neural Network</h2><p>Downloads MNIST (~12 MB first run). ~3–5 min on GPU.</p><div class="sl-g"><label>Epochs <span id="epCnt">15</span></label><input type="range" id="epSl" min="5" max="30" value="15"></div><div class="mo-btn"><button class="b" id="mCancel">Cancel</button><button class="b b-a" id="mStart">Start</button></div></div></div>
+<div class="mo" id="mShut"><div class="mo-b"><h2>Close Project?</h2><p>Shuts down the server. Run <code style="font-family:var(--mono);background:var(--inset);padding:.1em .25em;border-radius:3px;font-size:.8em">python run_backend.py</code> to restart.</p><div class="mo-btn"><button class="b" id="mShutNo">Cancel</button><button class="b" id="mShutYes" style="background:var(--err);color:#fff;border-color:var(--err)">Shut Down</button></div></div></div>
 
 <script>
-/* ============================================================
-   DIGIT AI — CLIENT APPLICATION
-   Real-time WebSocket inference, network visualization, charts
-   ============================================================ */
+const $=id=>document.getElementById(id);
+const dpr=window.devicePixelRatio||1;
+function css(v){return getComputedStyle(document.documentElement).getPropertyValue(v).trim()}
 
-// === THEME TOGGLE ===
-const themeToggle = document.getElementById('themeToggle');
-const savedTheme = localStorage.getItem('digit-ai-theme') || 'dark';
-document.documentElement.setAttribute('data-theme', savedTheme);
+document.documentElement.setAttribute('data-theme',localStorage.getItem('dai-th')||'dark');
+$('thBtn').onclick=()=>{const n=document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark';document.documentElement.setAttribute('data-theme',n);localStorage.setItem('dai-th',n);netIdle();renderCharts()};
 
-themeToggle.addEventListener('click', () => {
-  const current = document.documentElement.getAttribute('data-theme');
-  const next = current === 'dark' ? 'light' : 'dark';
-  document.documentElement.setAttribute('data-theme', next);
-  localStorage.setItem('digit-ai-theme', next);
-  drawNetworkIdle();
-  renderCharts();
-});
+const cb=$('cBars');for(let i=0;i<10;i++)cb.innerHTML+=`<div class="cr"><span class="cr-l">${i}</span><div class="cr-tk"><div class="cr-fl" id="b${i}"></div></div><span class="cr-v" id="v${i}">0%</span></div>`;
 
-// === DOM REFS ===
-const $ = id => document.getElementById(id);
-const networkCanvas = $('networkCanvas');
-const networkCtx = networkCanvas.getContext('2d');
-const drawCanvasEl = $('drawCanvas');
-const drawCtx = drawCanvasEl.getContext('2d');
+// DRAW
+const dc=$('drawCanvas'),dx=dc.getContext('2d');
+let isDr=false,hasCt=false,lx,ly;
+function initDr(){dc.width=228;dc.height=228;dx.lineCap='round';dx.lineJoin='round';clrCvs()}
+function clrCvs(){dx.fillStyle='#000';dx.fillRect(0,0,228,228);hasCt=false;updPred(null)}
+function gP(e){const r=dc.getBoundingClientRect(),t=e.touches?e.touches[0]:e;return{x:(t.clientX-r.left)*(228/r.width),y:(t.clientY-r.top)*(228/r.height)}}
+function sD(e){e.preventDefault();isDr=true;const p=gP(e);lx=p.x;ly=p.y}
+function mD(e){if(!isDr)return;e.preventDefault();const p=gP(e);dx.strokeStyle='#fff';dx.lineWidth=16;dx.beginPath();dx.moveTo(lx,ly);dx.lineTo(p.x,p.y);dx.stroke();lx=p.x;ly=p.y;hasCt=true;reqPred()}
+function eD(){isDr=false;if(hasCt)reqPred()}
+dc.addEventListener('mousedown',sD);dc.addEventListener('mousemove',mD);dc.addEventListener('mouseup',eD);dc.addEventListener('mouseleave',eD);
+dc.addEventListener('touchstart',sD,{passive:false});dc.addEventListener('touchmove',mD,{passive:false});dc.addEventListener('touchend',eD);
 
-// === CONFIDENCE BARS INIT ===
-const barsContainer = $('confidenceBars');
-for (let i = 0; i < 10; i++) {
-  barsContainer.innerHTML += `
-    <div class="conf-row">
-      <span class="conf-label">${i}</span>
-      <div class="conf-bar-track"><div class="conf-bar-fill" id="bar${i}"></div></div>
-      <span class="conf-value" id="val${i}">0.0%</span>
-    </div>`;
+function getPx(){
+  const sd=dx.getImageData(0,0,228,228);let x0=228,y0=228,x1=0,y1=0,f=false;
+  for(let y=0;y<228;y++)for(let x=0;x<228;x++){const i=(y*228+x)*4,b=.299*sd.data[i]+.587*sd.data[i+1]+.114*sd.data[i+2];if(b>30){if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y;f=true}}
+  if(!f)return Array(784).fill(0);
+  const cw=x1-x0+1,ch=y1-y0+1,t=document.createElement('canvas');t.width=28;t.height=28;
+  const tc=t.getContext('2d');tc.fillStyle='#000';tc.fillRect(0,0,28,28);
+  const s=Math.min(20/cw,20/ch),dw=cw*s,dh=ch*s;tc.imageSmoothingEnabled=true;tc.imageSmoothingQuality='high';
+  tc.drawImage(dc,x0,y0,cw,ch,(28-dw)/2,(28-dh)/2,dw,dh);
+  const id=tc.getImageData(0,0,28,28),px=new Float32Array(784);
+  for(let i=0;i<784;i++)px[i]=.299*id.data[i*4]+.587*id.data[i*4+1]+.114*id.data[i*4+2];
+  return Array.from(px);
 }
 
-// === DRAWING CANVAS ===
-const CANVAS_SIZE = 280;
-let isDrawing = false;
-let hasContent = false;
-let lastX, lastY;
+// WS
+let ws,wsOk=false,pend=false,lpT=0,lastPD=null;
+function connWS(){const p=location.protocol==='https:'?'wss:':'ws:';ws=new WebSocket(`${p}//${location.host}/ws`);
+  ws.onopen=()=>{wsOk=true;setSt('ok','Live');$('fSt').textContent='Live inference running'};
+  ws.onmessage=e=>onMsg(JSON.parse(e.data));ws.onclose=()=>{wsOk=false;setSt('off','Offline');setTimeout(connWS,2000)};ws.onerror=()=>{wsOk=false}}
+function setSt(t,s){$('sPill').className='pill '+(t==='ok'?'pill-ok':t==='off'?'pill-off':'pill-tr');$('sTxt').textContent=s}
+function reqPred(){if(!wsOk||!hasCt||pend||Date.now()-lpT<50)return;lpT=Date.now();pend=true;ws.send(JSON.stringify({type:'predict',data:{pixels:getPx()}}))}
 
-function initDrawCanvas() {
-  const wrapper = drawCanvasEl.parentElement;
-  const size = wrapper.clientWidth;
-  drawCanvasEl.width = size;
-  drawCanvasEl.height = size;
-  drawCtx.lineCap = 'round';
-  drawCtx.lineJoin = 'round';
-  clearCanvas();
+function onMsg(m){switch(m.type){
+  case'init':
+    if(m.data.model_loaded)$('mSt').textContent='Ready';
+    $('sDev').textContent=m.data.device||'—';
+    if(m.data.training_history && m.data.training_history.accuracy && m.data.training_history.accuracy.length>0){
+      tD=m.data.training_history;renderCharts();
+      $('sAcc').textContent=tD.accuracy[tD.accuracy.length-1]+'%';
+      $('epTag').textContent=tD.accuracy.length+' ep';
+      if(tD.train_loss&&tD.train_loss.length)$('sLoss').textContent=tD.train_loss[tD.train_loss.length-1].toFixed(4);
+    }break;
+  case'prediction':pend=false;if(!m.data.error){lastPD=m.data;updPred(m.data);drawNet(m.data.activations,m.data.probabilities,m.data.digit);updFps(m.data.inference_ms);startAnim()}break;
+  case'training_started':setSt('tr','Training');$('prg').classList.add('on');$('mSt').textContent='Training';break;
+  case'training_complete':setSt('ok','Live');$('prg').classList.remove('on');$('mSt').textContent='Ready';if(m.data.history){tD=m.data.history;renderCharts();$('sAcc').textContent=m.data.accuracy+'%';$('epTag').textContent=m.data.epochs+' ep'}break;
+  case'training_update':updTr(m.data);break;
+  case'model_reset':$('mSt').textContent='No Model';tD={train_loss:[],test_loss:[],accuracy:[]};renderCharts();clrCvs();lastPD=null;netIdle();break;
+  case'shutdown_ack':document.body.innerHTML='<div style="display:flex;height:100vh;align-items:center;justify-content:center;font-family:DM Sans;color:#777;font-size:1rem;flex-direction:column;gap:6px"><span style="font-size:1.8rem">✓</span>Server shut down<br><span style="font-size:.75rem;color:#999">Close this tab</span></div>';break;
+}}
+
+let fpsH=[];
+function updFps(ms){fpsH.push(ms);if(fpsH.length>30)fpsH.shift();const a=fpsH.reduce((s,v)=>s+v,0)/fpsH.length;$('fFps').textContent=Math.round(1000/a)+' FPS';$('sInf').textContent=a.toFixed(1)+' ms'}
+function updPred(d){if(!d){$('pDig').textContent='—';$('pDig').classList.remove('on');$('pConf').textContent='0.0%';$('pMs').textContent='—';for(let i=0;i<10;i++){$('b'+i).style.width='0%';$('b'+i).className='cr-fl';$('v'+i).textContent='0%';$('v'+i).className='cr-v'}return}
+  $('pDig').textContent=d.digit;$('pDig').classList.add('on');$('pConf').textContent=d.confidence+'%';$('pMs').textContent=d.inference_ms+' ms';
+  for(let i=0;i<10;i++){const p=d.probabilities[i];$('b'+i).style.width=p+'%';$('v'+i).textContent=p.toFixed(1)+'%';$('b'+i).className=i===d.digit?'cr-fl hit':'cr-fl';$('v'+i).className=i===d.digit?'cr-v hit':'cr-v'}}
+function updTr(d){$('prgFl').style.width=(d.epoch/d.total_epochs*100)+'%';$('prgEp').textContent=`Epoch ${d.epoch}/${d.total_epochs}`;$('prgAc').textContent=d.accuracy+'%';$('sAcc').textContent=d.accuracy+'%';$('sLoss').textContent=d.test_loss.toFixed(4);tD.accuracy.push(d.accuracy);tD.train_loss.push(d.train_loss);tD.test_loss.push(d.test_loss);renderCharts();$('epTag').textContent=d.epoch+' ep'}
+
+/* ================================================================
+   NEURAL NETWORK — clean: one dot color, one line color,
+   green for predicted path, red for others, default on reset
+   ================================================================ */
+const nc=$('netCvs'),nx=nc.getContext('2d');
+const LY=[{n:14},{n:10},{n:12},{n:12},{n:10}];
+
+function resN(){
+  const box=nc.parentElement.getBoundingClientRect();
+  const w=box.width,h=250;
+  nc.width=w*dpr;nc.height=h*dpr;
+  nx.setTransform(dpr,0,0,dpr,0,0);
+  nc.style.width=w+'px';nc.style.height=h+'px';
+}
+function nPos(w,h){
+  const px=35,gx=(w-px*2)/(LY.length-1),out=[];
+  for(let l=0;l<LY.length;l++){const x=px+l*gx,n=LY[l].n,gap=Math.min(15,(h-20)/(n+1)),sy=(h-(n-1)*gap)/2,a=[];for(let i=0;i<n;i++)a.push({x,y:sy+i*gap});out.push(a)}return out;
 }
 
-function clearCanvas() {
-  // Fill with black background (MNIST standard: black bg, white digit)
-  drawCtx.fillStyle = '#000000';
-  drawCtx.fillRect(0, 0, drawCanvasEl.width, drawCanvasEl.height);
-  hasContent = false;
-  updatePredictionUI(null);
+// DEFAULT state: single color dots, single color lines
+function netIdle(){
+  resN();const w=nc.width/dpr,h=nc.height/dpr,pos=nPos(w,h);
+  const dotC=css('--n-dot-idle'),lineC=css('--conn-default');
+  nx.clearRect(0,0,w,h);
+  // all lines in default color
+  for(let l=0;l<pos.length-1;l++){
+    const step=Math.max(1,Math.floor(pos[l].length*pos[l+1].length/80));let c=0;
+    for(let i=0;i<pos[l].length;i++)for(let j=0;j<pos[l+1].length;j++){if(c++%step)continue;
+      nx.beginPath();nx.moveTo(pos[l][i].x,pos[l][i].y);nx.lineTo(pos[l+1][j].x,pos[l+1][j].y);
+      nx.strokeStyle=lineC;nx.lineWidth=.6;nx.stroke()}}
+  // all dots in default color
+  for(const L of pos)for(const n of L){nx.beginPath();nx.arc(n.x,n.y,4,0,Math.PI*2);nx.fillStyle=dotC;nx.fill()}
 }
 
-function getPos(e) {
-  const rect = drawCanvasEl.getBoundingClientRect();
-  const touch = e.touches ? e.touches[0] : e;
-  return {
-    x: (touch.clientX - rect.left) * (drawCanvasEl.width / rect.width),
-    y: (touch.clientY - rect.top) * (drawCanvasEl.height / rect.height)
-  };
-}
+// ACTIVE state: green for predicted output connections, red for others
+function drawNet(acts,probs,pred){
+  if(!acts||!Object.keys(acts).length)return netIdle();
+  resN();const w=nc.width/dpr,h=nc.height/dpr,pos=nPos(w,h);
+  const dotC=css('--n-dot');
+  const greenC=css('--conn-active');  // green
+  const redC=css('--conn-inactive');  // red
+  const defaultC=css('--conn-default');
 
-function startDraw(e) {
-  e.preventDefault();
-  isDrawing = true;
-  const p = getPos(e);
-  lastX = p.x; lastY = p.y;
-}
+  const A=[Array(LY[0].n).fill(.3),(acts.conv1||[]).slice(0,LY[1].n),(acts.conv2||[]).slice(0,LY[2].n),(acts.fc1||[]).slice(0,LY[3].n),(probs||[]).map(p=>p/100)];
+  for(let l=0;l<A.length;l++)while(A[l].length<LY[l].n)A[l].push(0);
 
-function draw(e) {
-  if (!isDrawing) return;
-  e.preventDefault();
-  const p = getPos(e);
-  // Always draw WHITE strokes on BLACK bg (MNIST standard)
-  drawCtx.strokeStyle = '#ffffff';
-  drawCtx.lineWidth = drawCanvasEl.width / 14;
-  drawCtx.beginPath();
-  drawCtx.moveTo(lastX, lastY);
-  drawCtx.lineTo(p.x, p.y);
-  drawCtx.stroke();
-  lastX = p.x; lastY = p.y;
-  hasContent = true;
-  requestPrediction();
-}
+  nx.clearRect(0,0,w,h);
 
-function endDraw() {
-  isDrawing = false;
-  if (hasContent) requestPrediction();
-}
+  // Draw connections: color based on whether they lead to predicted output
+  for(let l=0;l<pos.length-1;l++){
+    for(let i=0;i<pos[l].length;i++){
+      for(let j=0;j<pos[l+1].length;j++){
+        const str=Math.min(1,(A[l][i]+A[l+1][j])/2);
+        if(str<0.03)continue;
 
-drawCanvasEl.addEventListener('mousedown', startDraw);
-drawCanvasEl.addEventListener('mousemove', draw);
-drawCanvasEl.addEventListener('mouseup', endDraw);
-drawCanvasEl.addEventListener('mouseleave', endDraw);
-drawCanvasEl.addEventListener('touchstart', startDraw, { passive: false });
-drawCanvasEl.addEventListener('touchmove', draw, { passive: false });
-drawCanvasEl.addEventListener('touchend', endDraw);
+        // Is this connection part of the predicted path?
+        let isPredPath=false;
+        if(l===pos.length-2){
+          // Last hidden → output: green if j==predicted
+          isPredPath=(j===pred);
+        } else if(l===pos.length-3){
+          // Second-to-last: green if neuron is strongly active
+          isPredPath=(A[l][i]>0.3 && A[l+1][j]>0.3);
+        } else {
+          isPredPath=(str>0.35);
+        }
 
-function getPixelData() {
-  // Step 1: Get the raw canvas as grayscale
-  const srcW = drawCanvasEl.width;
-  const srcH = drawCanvasEl.height;
-  const srcData = drawCtx.getImageData(0, 0, srcW, srcH);
+        nx.beginPath();nx.moveTo(pos[l][i].x,pos[l][i].y);nx.lineTo(pos[l+1][j].x,pos[l+1][j].y);
 
-  // Step 2: Find bounding box of the drawn content
-  let minX = srcW, minY = srcH, maxX = 0, maxY = 0;
-  let found = false;
-  for (let y = 0; y < srcH; y++) {
-    for (let x = 0; x < srcW; x++) {
-      const idx = (y * srcW + x) * 4;
-      const r = srcData.data[idx];
-      const g = srcData.data[idx + 1];
-      const b = srcData.data[idx + 2];
-      const brightness = 0.299 * r + 0.587 * g + 0.114 * b;
-      if (brightness > 30) { // non-black pixel (part of the digit)
-        if (x < minX) minX = x;
-        if (x > maxX) maxX = x;
-        if (y < minY) minY = y;
-        if (y > maxY) maxY = y;
-        found = true;
+        if(isPredPath){
+          nx.strokeStyle=greenC;
+          nx.globalAlpha=0.3+str*0.7;
+          nx.lineWidth=0.5+str*2;
+        } else {
+          nx.strokeStyle=redC;
+          nx.globalAlpha=0.08+str*0.15;
+          nx.lineWidth=0.3+str*0.5;
+        }
+        nx.stroke();nx.globalAlpha=1;
       }
     }
   }
 
-  if (!found) {
-    return new Array(784).fill(0);
-  }
+  // All dots: single color, size varies by activation
+  for(let l=0;l<pos.length;l++){
+    for(let i=0;i<pos[l].length;i++){
+      const nd=pos[l][i],a=A[l][i]||0;
+      const r=3+a*3;
 
-  // Step 3: Crop to bounding box, then place centered in 20x20 area 
-  // with 4px padding on each side (MNIST standard)
-  const cropW = maxX - minX + 1;
-  const cropH = maxY - minY + 1;
+      nx.beginPath();nx.arc(nd.x,nd.y,r,0,Math.PI*2);
+      nx.fillStyle=dotC;
+      nx.globalAlpha=0.3+a*0.7;
+      nx.fill();nx.globalAlpha=1;
 
-  // Create centered 28x28 image
-  const tmp = document.createElement('canvas');
-  tmp.width = 28; tmp.height = 28;
-  const tc = tmp.getContext('2d');
-
-  // Black background
-  tc.fillStyle = '#000000';
-  tc.fillRect(0, 0, 28, 28);
-
-  // Fit into 20x20 center area (4px padding)
-  const targetSize = 20;
-  const scale = Math.min(targetSize / cropW, targetSize / cropH);
-  const drawW = cropW * scale;
-  const drawH = cropH * scale;
-  const offsetX = (28 - drawW) / 2;
-  const offsetY = (28 - drawH) / 2;
-
-  tc.imageSmoothingEnabled = true;
-  tc.imageSmoothingQuality = 'high';
-  tc.drawImage(drawCanvasEl, minX, minY, cropW, cropH, offsetX, offsetY, drawW, drawH);
-
-  // Step 4: Extract grayscale values (already white-on-black, no inversion needed)
-  const imgData = tc.getImageData(0, 0, 28, 28);
-  const pixels = new Float32Array(784);
-  for (let i = 0; i < 784; i++) {
-    const r = imgData.data[i * 4];
-    const g = imgData.data[i * 4 + 1];
-    const b = imgData.data[i * 4 + 2];
-    pixels[i] = 0.299 * r + 0.587 * g + 0.114 * b;
-  }
-  return Array.from(pixels);
-}
-
-// === WEBSOCKET ===
-let ws = null;
-let wsConnected = false;
-let pendingPredict = false;
-let lastPredictTime = 0;
-const PREDICT_THROTTLE = 50; // ms
-
-function connectWS() {
-  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  ws = new WebSocket(`${proto}//${location.host}/ws`);
-
-  ws.onopen = () => {
-    wsConnected = true;
-    setStatus('online', 'Live');
-    $('footerStatus').textContent = 'Status: Live inference running...';
-  };
-
-  ws.onmessage = (e) => {
-    const msg = JSON.parse(e.data);
-    handleMessage(msg);
-  };
-
-  ws.onclose = () => {
-    wsConnected = false;
-    setStatus('offline', 'Disconnected');
-    setTimeout(connectWS, 2000);
-  };
-
-  ws.onerror = () => {
-    wsConnected = false;
-  };
-}
-
-function handleMessage(msg) {
-  switch (msg.type) {
-    case 'init':
-      if (msg.data.model_loaded) {
-        $('modelStatus').textContent = 'Ready';
-        $('modelStatus').style.color = '';
-      }
-      $('statDevice').textContent = msg.data.device || '—';
-      if (msg.data.training_history?.accuracy?.length) {
-        trainingData = msg.data.training_history;
-        renderCharts();
-        const acc = trainingData.accuracy;
-        $('statAccuracy').textContent = acc[acc.length-1] + '%';
-        $('epochBadge').textContent = acc.length + ' Epochs';
-      }
-      break;
-
-    case 'prediction':
-      handlePrediction(msg.data);
-      pendingPredict = false;
-      break;
-
-    case 'training_started':
-      setStatus('training', 'Training...');
-      $('trainingProgress').classList.add('show');
-      $('modelStatus').textContent = 'Training';
-      break;
-
-    case 'training_complete':
-      setStatus('online', 'Live');
-      $('trainingProgress').classList.remove('show');
-      $('modelStatus').textContent = 'Ready';
-      if (msg.data.history) {
-        trainingData = msg.data.history;
-        renderCharts();
-        $('statAccuracy').textContent = msg.data.accuracy + '%';
-        $('epochBadge').textContent = msg.data.epochs + ' Epochs';
-      }
-      break;
-
-    case 'training_update':
-      updateTrainingProgress(msg.data);
-      break;
-
-    case 'model_reset':
-      $('modelStatus').textContent = 'No Model';
-      trainingData = { train_loss: [], test_loss: [], accuracy: [] };
-      renderCharts();
-      clearCanvas();
-      break;
-
-    case 'pong':
-      break;
-  }
-}
-
-function setStatus(type, text) {
-  const pill = $('statusPill');
-  pill.className = 'status-pill' + (type === 'offline' ? ' offline' : type === 'training' ? ' training' : '');
-  $('statusText').textContent = text;
-}
-
-function requestPrediction() {
-  if (!wsConnected || !hasContent || pendingPredict) return;
-  const now = Date.now();
-  if (now - lastPredictTime < PREDICT_THROTTLE) return;
-  lastPredictTime = now;
-  pendingPredict = true;
-
-  ws.send(JSON.stringify({
-    type: 'predict',
-    data: { pixels: getPixelData() }
-  }));
-}
-
-function handlePrediction(data) {
-  if (data.error) return;
-  updatePredictionUI(data);
-  drawNetwork(data.activations, data.probabilities, data.digit);
-  updateFPS(data.inference_ms);
-}
-
-// === FPS COUNTER ===
-let fpsHistory = [];
-function updateFPS(ms) {
-  fpsHistory.push(ms);
-  if (fpsHistory.length > 30) fpsHistory.shift();
-  const avg = fpsHistory.reduce((a, b) => a + b, 0) / fpsHistory.length;
-  const fps = Math.round(1000 / avg);
-  $('footerFPS').textContent = fps + ' FPS';
-  $('statInference').textContent = avg.toFixed(1) + ' ms';
-}
-
-// === UPDATE UI ===
-function updatePredictionUI(data) {
-  if (!data) {
-    $('predictedDigit').textContent = '—';
-    $('predictedDigit').classList.remove('active');
-    $('confidenceValue').textContent = '0.0%';
-    $('inferenceTime').textContent = '—';
-    for (let i = 0; i < 10; i++) {
-      $('bar' + i).style.width = '0%';
-      $('bar' + i).className = 'conf-bar-fill';
-      $('val' + i).textContent = '0.0%';
-      $('val' + i).className = 'conf-value';
-    }
-    return;
-  }
-
-  $('predictedDigit').textContent = data.digit;
-  $('predictedDigit').classList.add('active');
-  $('confidenceValue').textContent = data.confidence + '%';
-  $('inferenceTime').textContent = data.inference_ms + ' ms';
-
-  for (let i = 0; i < 10; i++) {
-    const p = data.probabilities[i];
-    $('bar' + i).style.width = p + '%';
-    $('val' + i).textContent = p.toFixed(1) + '%';
-    if (i === data.digit) {
-      $('bar' + i).className = 'conf-bar-fill predicted';
-      $('val' + i).className = 'conf-value predicted';
-    } else {
-      $('bar' + i).className = 'conf-bar-fill';
-      $('val' + i).className = 'conf-value';
-    }
-  }
-}
-
-function updateTrainingProgress(data) {
-  const pct = (data.epoch / data.total_epochs) * 100;
-  $('progressFill').style.width = pct + '%';
-  $('progressEpoch').textContent = `Epoch ${data.epoch}/${data.total_epochs}`;
-  $('progressAcc').textContent = data.accuracy + '%';
-  $('statAccuracy').textContent = data.accuracy + '%';
-  $('statLoss').textContent = data.test_loss.toFixed(4);
-
-  // Live chart update
-  if (!trainingData.accuracy) trainingData = { train_loss: [], test_loss: [], accuracy: [] };
-  trainingData.accuracy.push(data.accuracy);
-  trainingData.train_loss.push(data.train_loss);
-  trainingData.test_loss.push(data.test_loss);
-  renderCharts();
-  $('epochBadge').textContent = data.epoch + ' Epochs';
-}
-
-// === NEURAL NETWORK VISUALIZATION ===
-function resizeNetworkCanvas() {
-  const rect = networkCanvas.parentElement.getBoundingClientRect();
-  const dpr = window.devicePixelRatio || 1;
-  networkCanvas.width = rect.width * dpr;
-  networkCanvas.height = 220 * dpr;
-  networkCtx.scale(dpr, dpr);
-  networkCanvas.style.width = rect.width + 'px';
-  networkCanvas.style.height = '220px';
-}
-
-function getThemeColors() {
-  const cs = getComputedStyle(document.documentElement);
-  return {
-    neuronIdle: cs.getPropertyValue('--neuron-idle').trim(),
-    neuronActive: cs.getPropertyValue('--neuron-active').trim(),
-    connIdle: cs.getPropertyValue('--connection-idle').trim(),
-    connActive: cs.getPropertyValue('--connection-active').trim(),
-    text: cs.getPropertyValue('--text-muted').trim(),
-    accent: cs.getPropertyValue('--accent').trim(),
-    accentGlow: cs.getPropertyValue('--accent-glow').trim(),
-    surface: cs.getPropertyValue('--bg-surface').trim(),
-  };
-}
-
-// Layer config: [input_sample, conv1(16), conv2(32), fc1(128->sampled), output(10)]
-const LAYERS = [
-  { count: 12, label: 'Input' },
-  { count: 8, label: 'Conv1' },
-  { count: 10, label: 'Conv2' },
-  { count: 10, label: 'FC' },
-  { count: 10, label: 'Output' },
-];
-
-function getNeuronPositions(w, h) {
-  const pad = 50;
-  const layerGap = (w - pad * 2) / (LAYERS.length - 1);
-  const positions = [];
-
-  for (let l = 0; l < LAYERS.length; l++) {
-    const x = pad + l * layerGap;
-    const n = LAYERS[l].count;
-    const totalH = h - 40;
-    const gap = Math.min(18, totalH / (n + 1));
-    const startY = (h - (n - 1) * gap) / 2;
-    const layer = [];
-    for (let i = 0; i < n; i++) {
-      layer.push({ x, y: startY + i * gap });
-    }
-    positions.push(layer);
-  }
-  return positions;
-}
-
-function drawNetworkIdle() {
-  resizeNetworkCanvas();
-  const w = networkCanvas.width / (window.devicePixelRatio || 1);
-  const h = networkCanvas.height / (window.devicePixelRatio || 1);
-  const c = getThemeColors();
-  const pos = getNeuronPositions(w, h);
-
-  networkCtx.clearRect(0, 0, w, h);
-
-  // Connections
-  for (let l = 0; l < pos.length - 1; l++) {
-    for (let i = 0; i < pos[l].length; i++) {
-      for (let j = 0; j < pos[l+1].length; j++) {
-        networkCtx.beginPath();
-        networkCtx.moveTo(pos[l][i].x, pos[l][i].y);
-        networkCtx.lineTo(pos[l+1][j].x, pos[l+1][j].y);
-        networkCtx.strokeStyle = c.connIdle;
-        networkCtx.lineWidth = 0.5;
-        networkCtx.stroke();
-      }
-    }
-  }
-
-  // Neurons
-  for (let l = 0; l < pos.length; l++) {
-    for (const n of pos[l]) {
-      networkCtx.beginPath();
-      networkCtx.arc(n.x, n.y, 5, 0, Math.PI * 2);
-      networkCtx.fillStyle = c.neuronIdle;
-      networkCtx.fill();
-    }
-  }
-
-  $('networkCard').classList.remove('active');
-}
-
-function drawNetwork(activations, probabilities, predicted) {
-  if (!activations || Object.keys(activations).length === 0) return drawNetworkIdle();
-
-  resizeNetworkCanvas();
-  const w = networkCanvas.width / (window.devicePixelRatio || 1);
-  const h = networkCanvas.height / (window.devicePixelRatio || 1);
-  const c = getThemeColors();
-  const pos = getNeuronPositions(w, h);
-
-  // Build activation values per layer
-  const acts = [
-    Array(LAYERS[0].count).fill(0.3), // Input placeholder
-    (activations.conv1 || []).slice(0, LAYERS[1].count),
-    (activations.conv2 || []).slice(0, LAYERS[2].count),
-    (activations.fc1 || []).slice(0, LAYERS[3].count),
-    (probabilities || []).map(p => p / 100),
-  ];
-
-  // Pad
-  for (let l = 0; l < acts.length; l++) {
-    while (acts[l].length < LAYERS[l].count) acts[l].push(0);
-  }
-
-  networkCtx.clearRect(0, 0, w, h);
-
-  // Connections with activation
-  for (let l = 0; l < pos.length - 1; l++) {
-    for (let i = 0; i < pos[l].length; i++) {
-      for (let j = 0; j < pos[l+1].length; j++) {
-        const strength = Math.min(1, (acts[l][i] + acts[l+1][j]) / 2);
-        if (strength < 0.05) continue;
-        networkCtx.beginPath();
-        networkCtx.moveTo(pos[l][i].x, pos[l][i].y);
-        networkCtx.lineTo(pos[l+1][j].x, pos[l+1][j].y);
-        networkCtx.strokeStyle = strength > 0.3
-          ? c.connActive.replace('0.5', strength.toFixed(2))
-          : c.connIdle;
-        networkCtx.lineWidth = 0.3 + strength * 1.5;
-        networkCtx.stroke();
-      }
-    }
-  }
-
-  // Neurons with glow
-  for (let l = 0; l < pos.length; l++) {
-    for (let i = 0; i < pos[l].length; i++) {
-      const n = pos[l][i];
-      const a = acts[l][i] || 0;
-      const r = 4 + a * 3;
-
-      if (a > 0.3) {
-        networkCtx.beginPath();
-        networkCtx.arc(n.x, n.y, r + 6, 0, Math.PI * 2);
-        const grd = networkCtx.createRadialGradient(n.x, n.y, r, n.x, n.y, r + 6);
-        grd.addColorStop(0, c.accentGlow);
-        grd.addColorStop(1, 'transparent');
-        networkCtx.fillStyle = grd;
-        networkCtx.fill();
-      }
-
-      networkCtx.beginPath();
-      networkCtx.arc(n.x, n.y, r, 0, Math.PI * 2);
-      networkCtx.fillStyle = a > 0.1 ? c.neuronActive : c.neuronIdle;
-      networkCtx.globalAlpha = 0.3 + a * 0.7;
-      networkCtx.fill();
-      networkCtx.globalAlpha = 1;
-
-      // Output layer labels
-      if (l === pos.length - 1) {
-        networkCtx.font = '600 9px "JetBrains Mono"';
-        networkCtx.fillStyle = i === predicted ? c.accent : c.text;
-        networkCtx.textAlign = 'left';
-        networkCtx.fillText(i.toString(), n.x + r + 6, n.y + 3);
-
-        if (i === predicted) {
-          // Highlight predicted
-          networkCtx.beginPath();
-          networkCtx.arc(n.x, n.y, r + 3, 0, Math.PI * 2);
-          networkCtx.strokeStyle = c.accent;
-          networkCtx.lineWidth = 2;
-          networkCtx.stroke();
-
-          networkCtx.font = '700 10px "JetBrains Mono"';
-          networkCtx.fillStyle = c.accent;
-          networkCtx.fillText((probabilities[i]).toFixed(0) + '%', n.x + r + 18, n.y + 3);
+      // Output labels
+      if(l===pos.length-1){
+        const ip=i===pred;
+        nx.font=`${ip?700:600} ${ip?11:9}px "JetBrains Mono"`;
+        nx.fillStyle=ip?greenC:css('--t3');
+        nx.textAlign='left';
+        nx.fillText(i+'',nd.x+r+5,nd.y+3);
+        if(ip){
+          // Highlight ring
+          nx.beginPath();nx.arc(nd.x,nd.y,r+3,0,Math.PI*2);
+          nx.strokeStyle=greenC;nx.lineWidth=2;nx.stroke();
+          nx.font='700 10px "JetBrains Mono"';nx.fillStyle=greenC;
+          nx.fillText(probs[i].toFixed(0)+'%',nd.x+r+18,nd.y+3);
         }
       }
     }
   }
-
-  $('networkCard').classList.add('active');
 }
 
-// === CHARTS ===
-let trainingData = { train_loss: [], test_loss: [], accuracy: [] };
+let animOn=false;
+function startAnim(){/* no continuous animation needed — static green/red is clear */}
 
-function renderCharts() {
-  renderChart('chartAccuracy', trainingData.accuracy || [], {
-    color: getComputedStyle(document.documentElement).getPropertyValue('--success').trim(),
-    minY: 90, maxY: 100, suffix: '%'
-  });
-  renderChart('chartLoss', trainingData.train_loss || [], {
-    color: getComputedStyle(document.documentElement).getPropertyValue('--warning').trim(),
-    minY: 0, maxY: null, suffix: ''
-  });
-}
+// CHARTS
+let tD={train_loss:[],test_loss:[],accuracy:[]};
+function renderCharts(){rCh('chAcc',tD.accuracy||[],{color:css('--ok'),minY:90,maxY:100,sfx:'%'});rCh('chLoss',tD.train_loss||[],{color:css('--warn'),minY:0,maxY:null,sfx:''})}
+function rCh(id,data,o){
+  const cv=$(id),ct=cv.getContext('2d'),r=cv.parentElement.getBoundingClientRect();
+  cv.width=r.width*dpr;cv.height=r.height*dpr;ct.setTransform(dpr,0,0,dpr,0,0);cv.style.width=r.width+'px';cv.style.height=r.height+'px';
+  const w=r.width,h=r.height,pd={t:8,r:8,b:14,l:32},cW=w-pd.l-pd.r,cH=h-pd.t-pd.b;
+  ct.clearRect(0,0,w,h);const tc=css('--t3'),gc=css('--chart-g');
+  if(!data.length){ct.font='500 9px "DM Sans"';ct.fillStyle=tc;ct.textAlign='center';ct.fillText('Train to see data',w/2,h/2);return}
+  const mn=o.minY??Math.min(...data)*.95,mx=o.maxY??Math.max(...data)*1.05,rn=mx-mn||1;
+  ct.strokeStyle=gc;ct.lineWidth=1;
+  for(let i=0;i<=4;i++){const y=pd.t+cH/4*i;ct.beginPath();ct.moveTo(pd.l,y);ct.lineTo(w-pd.r,y);ct.stroke();const v=mx-(rn/4)*i;ct.font='500 7px "JetBrains Mono"';ct.fillStyle=tc;ct.textAlign='right';ct.fillText(v.toFixed(v>10?1:3)+o.sfx,pd.l-4,y+3)}
+  const sx=data.length>1?cW/(data.length-1):0;ct.beginPath();
+  for(let i=0;i<data.length;i++){const x=pd.l+i*sx,y=pd.t+cH-((data[i]-mn)/rn)*cH;i===0?ct.moveTo(x,y):ct.lineTo(x,y)}
+  ct.strokeStyle=o.color;ct.lineWidth=2;ct.lineJoin='round';ct.stroke();
+  ct.lineTo(pd.l+(data.length-1)*sx,pd.t+cH);ct.lineTo(pd.l,pd.t+cH);ct.closePath();
+  const gd=ct.createLinearGradient(0,pd.t,0,pd.t+cH);gd.addColorStop(0,o.color+'25');gd.addColorStop(1,o.color+'04');ct.fillStyle=gd;ct.fill();
+  for(let i=0;i<data.length;i++){const x=pd.l+i*sx,y=pd.t+cH-((data[i]-mn)/rn)*cH;ct.beginPath();ct.arc(x,y,2.5,0,Math.PI*2);ct.fillStyle=o.color;ct.fill()}}
 
-function renderChart(canvasId, data, opts) {
-  const canvas = $(canvasId);
-  const ctx = canvas.getContext('2d');
-  const rect = canvas.parentElement.getBoundingClientRect();
-  const dpr = window.devicePixelRatio || 1;
-  canvas.width = rect.width * dpr;
-  canvas.height = rect.height * dpr;
-  ctx.scale(dpr, dpr);
-  canvas.style.width = rect.width + 'px';
-  canvas.style.height = rect.height + 'px';
+// BUTTONS
+$('btnCl').onclick=()=>{clrCvs();lastPD=null;netIdle()};
+$('btnTr').onclick=()=>$('mTrain').classList.add('on');
+$('mCancel').onclick=()=>$('mTrain').classList.remove('on');
+$('epSl').oninput=e=>$('epCnt').textContent=e.target.value;
+$('mStart').onclick=()=>{const ep=+$('epSl').value;$('mTrain').classList.remove('on');tD={train_loss:[],test_loss:[],accuracy:[]};ws.send(JSON.stringify({type:'train',data:{epochs:ep}}))};
+$('btnRs').onclick=()=>{if(confirm('Reset model?'))ws.send(JSON.stringify({type:'reset_model'}))};
+$('btnOff').onclick=()=>$('mShut').classList.add('on');
+$('mShutNo').onclick=()=>$('mShut').classList.remove('on');
+$('mShutYes').onclick=()=>{$('mShut').classList.remove('on');if(wsOk)ws.send(JSON.stringify({type:'shutdown'}));fetch('/api/shutdown',{method:'POST'}).catch(()=>{});document.body.innerHTML='<div style="display:flex;height:100vh;align-items:center;justify-content:center;font-family:DM Sans,sans-serif;color:#777;font-size:1rem;flex-direction:column;gap:6px"><span style="font-size:1.8rem">✓</span>Server shut down<br><span style="font-size:.75rem;color:#999">Close this tab</span></div>'};
 
-  const w = rect.width;
-  const h = rect.height;
-  const pad = { top: 10, right: 10, bottom: 20, left: 40 };
-  const chartW = w - pad.left - pad.right;
-  const chartH = h - pad.top - pad.bottom;
-
-  ctx.clearRect(0, 0, w, h);
-
-  if (!data.length) {
-    ctx.font = '500 11px "Sora"';
-    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--text-muted').trim();
-    ctx.textAlign = 'center';
-    ctx.fillText('No data yet — train the model', w / 2, h / 2);
-    return;
-  }
-
-  const minY = opts.minY ?? Math.min(...data) * 0.95;
-  const maxY = opts.maxY ?? Math.max(...data) * 1.05;
-  const rangeY = maxY - minY || 1;
-
-  const gridColor = getComputedStyle(document.documentElement).getPropertyValue('--chart-grid').trim();
-  const textColor = getComputedStyle(document.documentElement).getPropertyValue('--text-muted').trim();
-
-  // Grid lines
-  ctx.strokeStyle = gridColor;
-  ctx.lineWidth = 1;
-  for (let i = 0; i <= 4; i++) {
-    const y = pad.top + (chartH / 4) * i;
-    ctx.beginPath();
-    ctx.moveTo(pad.left, y);
-    ctx.lineTo(w - pad.right, y);
-    ctx.stroke();
-
-    const val = maxY - (rangeY / 4) * i;
-    ctx.font = '500 9px "JetBrains Mono"';
-    ctx.fillStyle = textColor;
-    ctx.textAlign = 'right';
-    ctx.fillText(val.toFixed(val > 10 ? 1 : 3) + opts.suffix, pad.left - 6, y + 3);
-  }
-
-  // X labels
-  if (data.length > 1) {
-    ctx.font = '500 9px "JetBrains Mono"';
-    ctx.fillStyle = textColor;
-    ctx.textAlign = 'center';
-    ctx.fillText('1', pad.left, h - 4);
-    ctx.fillText(data.length.toString(), w - pad.right, h - 4);
-  }
-
-  // Line
-  const stepX = data.length > 1 ? chartW / (data.length - 1) : 0;
-  ctx.beginPath();
-  for (let i = 0; i < data.length; i++) {
-    const x = pad.left + i * stepX;
-    const y = pad.top + chartH - ((data[i] - minY) / rangeY) * chartH;
-    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-  }
-  ctx.strokeStyle = opts.color;
-  ctx.lineWidth = 2;
-  ctx.lineJoin = 'round';
-  ctx.stroke();
-
-  // Fill
-  const lastX = pad.left + (data.length - 1) * stepX;
-  ctx.lineTo(lastX, pad.top + chartH);
-  ctx.lineTo(pad.left, pad.top + chartH);
-  ctx.closePath();
-  const grd = ctx.createLinearGradient(0, pad.top, 0, pad.top + chartH);
-  grd.addColorStop(0, opts.color + '30');
-  grd.addColorStop(1, opts.color + '05');
-  ctx.fillStyle = grd;
-  ctx.fill();
-
-  // Dots
-  for (let i = 0; i < data.length; i++) {
-    const x = pad.left + i * stepX;
-    const y = pad.top + chartH - ((data[i] - minY) / rangeY) * chartH;
-    ctx.beginPath();
-    ctx.arc(x, y, 3, 0, Math.PI * 2);
-    ctx.fillStyle = opts.color;
-    ctx.fill();
-  }
-}
-
-// === BUTTONS ===
-$('btnClear').addEventListener('click', clearCanvas);
-
-$('btnTrain').addEventListener('click', () => {
-  $('trainModal').classList.add('show');
-});
-$('modalCancel').addEventListener('click', () => {
-  $('trainModal').classList.remove('show');
-});
-$('epochSlider').addEventListener('input', (e) => {
-  $('epochCount').textContent = e.target.value;
-});
-$('modalStart').addEventListener('click', () => {
-  const epochs = parseInt($('epochSlider').value);
-  $('trainModal').classList.remove('show');
-  trainingData = { train_loss: [], test_loss: [], accuracy: [] };
-  ws.send(JSON.stringify({ type: 'train', data: { epochs } }));
-});
-
-$('btnReset').addEventListener('click', () => {
-  if (confirm('Reset model? This will delete the trained weights.')) {
-    ws.send(JSON.stringify({ type: 'reset_model' }));
-  }
-});
-
-// === HEARTBEAT ===
-setInterval(() => {
-  if (wsConnected) ws.send(JSON.stringify({ type: 'ping' }));
-}, 15000);
-
-// === RESIZE ===
-window.addEventListener('resize', () => {
-  initDrawCanvas();
-  drawNetworkIdle();
-  renderCharts();
-});
-
-// === INIT ===
-initDrawCanvas();
-drawNetworkIdle();
-renderCharts();
-connectWS();
+setInterval(()=>{if(wsOk)ws.send(JSON.stringify({type:'ping'}))},15000);
+window.addEventListener('resize',()=>{netIdle();renderCharts()});
+initDr();netIdle();renderCharts();connWS();
 </script>
 </body>
 </html>

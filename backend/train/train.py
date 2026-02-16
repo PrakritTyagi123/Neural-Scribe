@@ -107,7 +107,7 @@ def train_model(epochs=15, lr=0.001, batch_size=64, save_path='backend/models/di
         history['accuracy'].append(accuracy)
         history['epoch_times'].append(epoch_time)
 
-        # Save best model
+        # Save best model + history
         if accuracy > best_accuracy:
             best_accuracy = accuracy
             os.makedirs(os.path.dirname(save_path), exist_ok=True)
@@ -115,6 +115,11 @@ def train_model(epochs=15, lr=0.001, batch_size=64, save_path='backend/models/di
                 'model_state_dict': model.state_dict(),
                 'accuracy': accuracy,
                 'epoch': epoch + 1,
+                'history': {
+                    'train_loss': history['train_loss'][:],
+                    'test_loss': history['test_loss'][:],
+                    'accuracy': history['accuracy'][:],
+                },
             }, save_path)
 
         print(f"Epoch {epoch+1}/{epochs} | "
