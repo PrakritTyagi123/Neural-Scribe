@@ -260,6 +260,43 @@ Each **ResBlock** contains:
 
 ---
 
+## Training Results
+
+Trained for **100 epochs** on CUDA with mixed precision. Best model saved at epoch 58.
+
+| Metric | Value |
+|--------|-------|
+| **Best accuracy** | **91.31%** |
+| **Best epoch** | 58 |
+| **Final accuracy** | 91.16% |
+| **Final train loss** | 0.3834 |
+| **Final test loss** | 0.2975 |
+| **Avg epoch time** | ~128s |
+| **Total training time** | ~3.5 hours |
+
+### Training Progression
+
+| Phase | Epochs | Accuracy | What happened |
+|-------|--------|----------|---------------|
+| Rapid learning | 1–10 | 78% → 91% | Model learns basic character shapes. LR warming up then first cosine decay. |
+| First plateau | 10–30 | 90–91% | Accuracy oscillates as warm restarts reset LR. Each cycle refines features. |
+| Peak | 58 | **91.31%** | Best model checkpoint saved. Fine-grained features for confusable pairs locked in. |
+| Late training | 58–100 | 90–91% | Accuracy holds but doesn't improve. Warm restarts keep exploring but no better minima found. |
+
+<!-- 
+📸 TRAINING LOG — The terminal output showing full 100-epoch training run.
+   Save as: assets/training-log.png
+-->
+![Training Log](assets/training-log.png)
+
+<!-- 
+📸 ACCURACY — After training completes, capture the accuracy chart showing the full curve.
+   Save as: assets/accuracy.png
+-->
+![Accuracy Chart](assets/accuracy.png)
+
+---
+
 ## Training Pipeline
 
 ### Optimizer & Scheduler
@@ -272,12 +309,6 @@ Each **ResBlock** contains:
 **Focal Loss** with label smoothing:
 - **Focal** (γ=2.0): down-weights easy examples, focuses training on hard/confusable characters. A confidently correct prediction gets near-zero loss. A confused O/0 prediction gets amplified loss.
 - **Label smoothing** (0.1): target for correct class is 0.9 instead of 1.0, remainder spread across other classes. Prevents overconfident outputs that hurt generalization.
-
-<!-- 
-📸 ACCURACY — After training completes, capture the accuracy chart showing the full curve.
-   Save as: assets/accuracy.png
--->
-![Accuracy Chart](assets/accuracy.png)
 
 ### Data Augmentation
 
