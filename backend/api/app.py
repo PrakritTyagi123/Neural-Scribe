@@ -1,6 +1,10 @@
 """
 app.py - FastAPI Server with Real-Time WebSocket
 Handles live inference, training triggers, and broadcasts updates.
+
+Fixes over original:
+- Safer CUDA threading for training
+- Consistent error handling
 """
 import asyncio
 import json
@@ -31,7 +35,7 @@ async def lifespan(app: FastAPI):
     global predictor, device
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Device: {device}")
-    predictor = Predictor(device=device)
+    predictor = Predictor(device=device, use_tta=True)
     yield
     print("Shutting down...")
 
@@ -123,12 +127,12 @@ async def run_training(epochs=15):
         import queue as queue_module
         from backend.train.train import train_model
 
-        # Thread-safe queue: training thread pushes updates, we poll from async side
         progress_queue = queue_module.Queue()
-
         loop = asyncio.get_event_loop()
 
         def train_sync():
+            # Device is created inside train_model for thread safety
+            # but we pass it as a hint
             return train_model(
                 epochs=epochs,
                 save_path='backend/models/digit_model.pt',
@@ -139,14 +143,12 @@ async def run_training(epochs=15):
         # Start training in thread pool
         train_future = loop.run_in_executor(None, train_sync)
 
-        # Poll the queue every 0.5s and broadcast updates while training runs
+        # Poll the queue every 0.5s and broadcast updates
         while not train_future.done():
             await asyncio.sleep(0.5)
-            # Drain all pending updates from the queue
             while True:
                 try:
                     update = progress_queue.get_nowait()
-                    # Broadcast to all connected clients
                     await broadcast({
                         'type': 'training_update',
                         'data': update
@@ -157,7 +159,7 @@ async def run_training(epochs=15):
         # Get final result
         model, history = train_future.result()
 
-        # Drain any remaining updates
+        # Drain remaining updates
         while True:
             try:
                 update = progress_queue.get_nowait()
@@ -173,10 +175,10 @@ async def run_training(epochs=15):
         training_history['test_loss'] = history['test_loss']
         training_history['accuracy'] = history['accuracy']
 
-        # Reload the model
+        # Reload model
         predictor.load_model('backend/models/digit_model.pt')
 
-        # Broadcast completion with full history
+        # Broadcast completion
         await broadcast({
             'type': 'training_complete',
             'data': {
@@ -208,7 +210,7 @@ async def reset_model():
     if model_path.exists():
         model_path.unlink()
 
-    predictor = Predictor(device=device)
+    predictor = Predictor(device=device, use_tta=True)
     training_history = {'train_loss': [], 'test_loss': [], 'accuracy': []}
 
     await broadcast({

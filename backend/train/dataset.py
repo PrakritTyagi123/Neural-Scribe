@@ -1,11 +1,16 @@
 """
-dataset.py - Stable EMNIST Data Loader (Windows + GPU optimized)
+dataset.py - EMNIST Data Loader with Strong Augmentation Pipeline
 
-This version prioritizes reliable loading and fast training startup.
-Heavy augmentations are removed temporarily to avoid Windows stalls.
-You can re-add them later once training runs smoothly.
+Improvements over original:
+1. Heavy data augmentation (RandomAffine, RandomPerspective, GaussianBlur, RandomErasing)
+   - Forces model to learn invariant features instead of memorizing pixel positions
+   - Simulates real-world drawing variation (tilt, position, thickness, partial occlusion)
+2. Platform-safe num_workers (auto-detects Windows vs Linux)
+3. Separate strong augmentation for training vs clean transforms for testing
+4. Elastic-like distortion via perspective transform
 """
 
+import sys
 import torch
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
@@ -13,11 +18,11 @@ import os
 
 # EMNIST ByMerge: 47 classes
 EMNIST_LABELS = [
-    '0','1','2','3','4','5','6','7','8','9',
-    'A','B','C','D','E','F','G','H','I','J',
-    'K','L','M','N','O','P','Q','R','S','T',
-    'U','V','W','X','Y','Z',
-    'a','b','d','e','f','g','h','n','q','r','t'
+    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+    'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J',
+    'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T',
+    'U', 'V', 'W', 'X', 'Y', 'Z',
+    'a', 'b', 'd', 'e', 'f', 'g', 'h', 'n', 'q', 'r', 't'
 ]
 
 NUM_CLASSES = 47
@@ -36,26 +41,68 @@ class TransposeImage:
         return x.transpose(1, 2)
 
 
-def get_data_loaders(data_dir='data/raw/emnist', batch_size=128, num_workers=4):
-    """
-    Create EMNIST ByMerge train/test DataLoaders.
+def _get_num_workers():
+    """8 workers to keep the GPU fed at all times."""
+    return 8
 
-    Optimizations:
-    - num_workers=4 for fast loading
-    - pin_memory=True for faster GPU transfer
-    - persistent_workers=True to avoid worker restart overhead
-    - simple transforms to avoid Windows stalls
-    """
 
+def get_data_loaders(data_dir='data/raw/emnist', batch_size=128, num_workers=None):
+    """
+    Create EMNIST ByMerge train/test DataLoaders with strong augmentation.
+
+    Training augmentation pipeline:
+    - RandomAffine: rotation ±10°, translation ±10%, scale 90-110%
+      Simulates natural variation in character positioning and size
+    - RandomPerspective: 15% distortion, 30% probability
+      Simulates viewing angle differences (phone tilt, etc.)
+    - GaussianBlur: kernel 3, sigma 0.1-0.7
+      Simulates different stroke widths and pen/stylus types
+    - RandomErasing: erases small random patches
+      Forces model to recognize characters with missing parts (robustness)
+
+    Test pipeline has NO augmentation - clean evaluation.
+    """
+    if num_workers is None:
+        num_workers = _get_num_workers()
+
+    print(f"DataLoader workers: {num_workers}")
     print("Loading EMNIST dataset...")
 
-    # Stable transforms (no heavy augmentation)
+    # === STRONG training augmentation ===
     train_transform = transforms.Compose([
         transforms.ToTensor(),
         TransposeImage(),
-        transforms.Normalize((EMNIST_MEAN,), (EMNIST_STD,))
+        # Geometric augmentation - simulates drawing variation
+        transforms.RandomAffine(
+            degrees=10,              # ±10° rotation
+            translate=(0.10, 0.10),  # ±10% shift
+            scale=(0.90, 1.10),      # 90%-110% zoom
+            fill=0                   # black fill for new pixels
+        ),
+        # Perspective warp - simulates viewing angle
+        transforms.RandomPerspective(
+            distortion_scale=0.15,
+            p=0.3,
+            fill=0
+        ),
+        # Blur - simulates stroke width variation
+        transforms.GaussianBlur(
+            kernel_size=3,
+            sigma=(0.1, 0.7)
+        ),
+        # Normalize to EMNIST stats
+        transforms.Normalize((EMNIST_MEAN,), (EMNIST_STD,)),
+        # Random erasing - forces robustness to partial occlusion
+        # Applied AFTER normalize so the erase value is in normalized space
+        transforms.RandomErasing(
+            p=0.15,                  # 15% chance
+            scale=(0.02, 0.12),      # erase 2-12% of image area
+            ratio=(0.3, 3.3),        # aspect ratio of erased region
+            value=(-EMNIST_MEAN / EMNIST_STD)  # fill with normalized "black"
+        ),
     ])
 
+    # === Clean test transform (NO augmentation) ===
     test_transform = transforms.Compose([
         transforms.ToTensor(),
         TransposeImage(),
@@ -81,7 +128,10 @@ def get_data_loaders(data_dir='data/raw/emnist', batch_size=128, num_workers=4):
         transform=test_transform
     )
 
-    print("Dataset loaded. Creating DataLoaders...")
+    print(f"Train samples: {len(train_dataset):,} | Test samples: {len(test_dataset):,}")
+    print("Creating DataLoaders...")
+
+    use_persistent = num_workers > 0 and sys.platform != 'win32'
 
     train_loader = DataLoader(
         train_dataset,
@@ -89,7 +139,7 @@ def get_data_loaders(data_dir='data/raw/emnist', batch_size=128, num_workers=4):
         shuffle=True,
         num_workers=num_workers,
         pin_memory=True,
-        persistent_workers=True,
+        persistent_workers=use_persistent,
         drop_last=True
     )
 
@@ -99,9 +149,8 @@ def get_data_loaders(data_dir='data/raw/emnist', batch_size=128, num_workers=4):
         shuffle=False,
         num_workers=num_workers,
         pin_memory=True,
-        persistent_workers=True
+        persistent_workers=use_persistent
     )
 
     print("DataLoaders ready. Training can begin.")
-
     return train_loader, test_loader

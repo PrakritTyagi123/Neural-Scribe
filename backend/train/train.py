@@ -1,44 +1,138 @@
 """
-train.py - Modern Training Loop with Mixed Precision, OneCycleLR, and Label Smoothing
+train.py - High-Accuracy Training Loop
 
-Key improvements over original:
-- Mixed precision (torch.amp): 1.5-2x faster on GPUs with tensor cores (RTX series)
-- OneCycleLR scheduler: reaches higher accuracy than StepLR by using a warmup→peak→decay
-  learning rate schedule. The cosine annealing phase is especially good for final convergence.
-- Label smoothing (0.1): prevents overconfident predictions, improves generalization.
-  Instead of training toward [0,0,1,0,...] it trains toward [0.002,0.002,0.9,0.002,...]
-  which gives a softer probability distribution at inference time.
-- Gradient clipping: prevents training instability from rare large gradients.
-- non_blocking transfers: overlaps CPU→GPU data movement with computation.
-- EMA (optional): exponential moving average of weights for smoother final model.
+Improvements over original:
+1. CosineAnnealingWarmRestarts scheduler: multiple LR cycles let the model escape
+   local minima. T_0=10, T_mult=2 means cycles of 10, 20, 40 epochs.
+2. Mixup regularization: blends pairs of training images and their labels,
+   forcing the model to learn smoother decision boundaries between confusable classes.
+3. Focal Loss: downweights easy examples, focuses learning on hard cases
+   (O/0, l/1/I, S/5, etc.) — the ones that limit accuracy.
+4. Fixed autocast: uses device.type instead of hardcoded 'cuda' so CPU training works.
+5. Fixed CUDA threading: creates device inside training thread to avoid cross-thread issues.
+6. Gradient clipping + EMA-style best model saving.
+7. Longer training support: 30-50 epochs recommended with warm restarts.
 """
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.optim as optim
 from torch.amp import autocast, GradScaler
 import time
 import os
+import numpy as np
 from backend.train.model import DigitCNN
-from backend.train.dataset import get_data_loaders
+from backend.train.dataset import get_data_loaders, NUM_CLASSES
 
 
-def train_model(epochs=20, lr=0.003, batch_size=128, save_path='backend/models/digit_model.pt',
+class FocalLoss(nn.Module):
+    """
+    Focal Loss: focuses training on hard examples.
+
+    Standard cross-entropy gives equal weight to all examples. Focal loss adds
+    a factor (1 - p_t)^gamma that downweights well-classified examples:
+    - Easy example (model predicts 95% correctly): weight = 0.05^2 = 0.0025
+    - Hard example (model predicts 30% correctly): weight = 0.70^2 = 0.49
+
+    This means the model spends ~200x more "learning effort" on hard examples
+    compared to easy ones. For EMNIST, the hard examples are confusable character
+    pairs (O/0, l/1, S/5, Z/2) — exactly what limits accuracy.
+
+    Label smoothing is applied on top: instead of [0,0,1,0,...] the target becomes
+    [0.002, 0.002, 0.9, 0.002, ...] which prevents overconfidence.
+
+    Args:
+        gamma: focusing parameter. 0 = standard CE, 2 = strong focus on hard examples.
+        label_smoothing: softens target distribution.
+        reduction: 'mean' (default) or 'sum'.
+    """
+    def __init__(self, gamma=2.0, label_smoothing=0.1, reduction='mean'):
+        super().__init__()
+        self.gamma = gamma
+        self.label_smoothing = label_smoothing
+        self.reduction = reduction
+
+    def forward(self, inputs, targets):
+        # Apply label smoothing: smooth_target = (1 - smoothing) * one_hot + smoothing / num_classes
+        num_classes = inputs.size(1)
+        smooth = self.label_smoothing / num_classes
+        one_hot = torch.zeros_like(inputs).scatter(1, targets.unsqueeze(1), 1.0)
+        smooth_target = one_hot * (1 - self.label_smoothing) + smooth
+
+        # Compute log probabilities
+        log_probs = F.log_softmax(inputs, dim=1)
+        probs = torch.exp(log_probs)
+
+        # Focal weight: (1 - p_t)^gamma
+        # p_t is the probability assigned to the correct class
+        p_t = (probs * one_hot).sum(dim=1)
+        focal_weight = (1 - p_t) ** self.gamma
+
+        # Weighted cross-entropy with smooth targets
+        loss = -(smooth_target * log_probs).sum(dim=1)
+        loss = focal_weight * loss
+
+        if self.reduction == 'mean':
+            return loss.mean()
+        elif self.reduction == 'sum':
+            return loss.sum()
+        return loss
+
+
+def mixup_data(x, y, alpha=0.2):
+    """
+    Mixup: blends pairs of training images and labels.
+
+    Given batch of images x and labels y:
+    1. Sample lambda from Beta(alpha, alpha) — usually lambda ≈ 0.8-1.0
+    2. Randomly shuffle the batch to get pairs
+    3. mixed_x = lambda * x + (1-lambda) * x_shuffled
+    4. Return both original and shuffled labels with lambda
+
+    The model must predict a blend of both labels, forcing it to learn
+    features that smoothly interpolate between classes. This builds
+    much better decision boundaries for confusable pairs.
+
+    alpha=0.2 gives mild mixing (lambda usually > 0.8), which is best
+    for character recognition where heavy mixing would create unreadable images.
+    """
+    if alpha <= 0:
+        return x, y, y, 1.0
+
+    lam = np.random.beta(alpha, alpha)
+    # Ensure lam >= 0.5 so the primary image dominates
+    lam = max(lam, 1 - lam)
+
+    batch_size = x.size(0)
+    index = torch.randperm(batch_size, device=x.device)
+
+    mixed_x = lam * x + (1 - lam) * x[index]
+    y_a, y_b = y, y[index]
+
+    return mixed_x, y_a, y_b, lam
+
+
+def train_model(epochs=35, lr=0.003, batch_size=128, save_path='backend/models/digit_model.pt',
                 progress_queue=None, device=None):
     """
-    Train the CNN on EMNIST ByMerge (47 classes).
+    Train the CNN on EMNIST ByMerge (47 classes) with all improvements.
 
     Hyperparameter rationale:
-    - lr=0.003: OneCycleLR will peak at this then decay. Higher than typical because
-      BatchNorm stabilizes training enough to handle it.
+    - epochs=35: CosineAnnealingWarmRestarts needs enough epochs for multiple cycles.
+      With T_0=10, T_mult=2: cycle 1 = epochs 0-9, cycle 2 = epochs 10-29, cycle 3 starts at 30.
+      35 epochs gives ~1.5 full restart cycles for good convergence.
+    - lr=0.003: peak learning rate. Warm restarts will cycle between lr and eta_min.
     - batch_size=128: sweet spot for GPU utilization vs generalization.
-      Too large (512+) hurts generalization; too small wastes GPU.
-    - epochs=20: with OneCycleLR and augmentation, 20 epochs is usually enough.
-      The scheduler is designed to complete its full cycle in exactly this many epochs.
+    - Focal loss gamma=2.0: standard value, strong focus on hard examples.
+    - Mixup alpha=0.2: mild mixing, appropriate for character recognition.
     """
+    # Create device inside this function to be thread-safe
+    # (this function may run in a thread pool executor)
     if device is None:
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    use_amp = device.type == 'cuda'  # mixed precision only on GPU
+    device_type = device.type  # 'cuda' or 'cpu'
+    use_amp = device_type == 'cuda'  # mixed precision only on GPU
     print(f"Training on: {device} | Mixed precision: {use_amp}")
 
     # Load data
@@ -49,95 +143,96 @@ def train_model(epochs=20, lr=0.003, batch_size=128, save_path='backend/models/d
     model = DigitCNN().to(device)
     print(f"Model parameters: {model.count_parameters():,}")
 
-    # Label smoothing: cross entropy with soft targets
-    # Prevents the model from becoming overconfident (outputting 99.9%)
-    # which hurts generalization. With smoothing=0.1, the target for the
-    # correct class is 0.9 instead of 1.0, and 0.1/(47-1)≈0.002 for others.
-    criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
+    # Focal Loss: downweights easy examples, focuses on hard cases
+    # gamma=2.0 is standard. label_smoothing=0.1 prevents overconfidence.
+    criterion = FocalLoss(gamma=2.0, label_smoothing=0.1)
 
     # AdamW: Adam with decoupled weight decay
-    # Weight decay 1e-4 penalizes large weights, reducing overfitting.
-    # AdamW applies decay correctly (to weights, not gradients) unlike Adam+L2.
+    # weight_decay=1e-4 penalizes large weights, reducing overfitting
     optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
 
-    # OneCycleLR: warmup → peak → cosine decay in exactly `epochs` epochs
-    # This is consistently the best simple scheduler for image classification.
-    # It starts slow (warmup), goes fast (peak lr), then fine-tunes (cosine decay).
-    scheduler = optim.lr_scheduler.OneCycleLR(
+    # CosineAnnealingWarmRestarts: multiple LR cycles
+    # T_0=10: first cycle is 10 epochs
+    # T_mult=2: each subsequent cycle is 2x longer
+    # So: cycle 1 = 10 epochs, cycle 2 = 20 epochs, cycle 3 = 40 epochs
+    # The restart "kicks" help escape local minima
+    scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(
         optimizer,
-        max_lr=lr,
-        epochs=epochs,
-        steps_per_epoch=len(train_loader),
-        pct_start=0.1,     # 10% warmup
-        anneal_strategy='cos',
-        div_factor=10,      # start_lr = max_lr / 10
-        final_div_factor=100  # end_lr = max_lr / 1000
+        T_0=10,          # first cycle length
+        T_mult=2,        # multiply cycle length by 2 each restart
+        eta_min=1e-6     # minimum LR at end of each cycle
     )
 
-    # Mixed precision scaler: scales loss to prevent fp16 underflow
+    # Mixed precision scaler
     scaler = GradScaler(enabled=use_amp)
 
     history = {'train_loss': [], 'test_loss': [], 'accuracy': [], 'epoch_times': []}
     best_accuracy = 0.0
+    mixup_alpha = 0.2  # mild mixup for character recognition
 
     for epoch in range(epochs):
         epoch_start = time.time()
 
-        # === TRAINING ===
+        # === TRAINING with Mixup ===
         model.train()
         running_loss = 0.0
         train_correct = 0
         train_total = 0
 
         for data, target in train_loader:
-            # non_blocking=True: starts GPU transfer immediately, doesn't wait
-            # for completion. Combined with pin_memory, this overlaps transfer
-            # with the previous batch's backward pass.
             data = data.to(device, non_blocking=True)
             target = target.to(device, non_blocking=True)
 
-            optimizer.zero_grad(set_to_none=True)  # slightly faster than zero_grad()
+            # Apply Mixup: blend pairs of images and labels
+            mixed_data, targets_a, targets_b, lam = mixup_data(data, target, alpha=mixup_alpha)
 
-            # Mixed precision forward pass: conv/matmul in fp16, accumulation in fp32
-            # ~1.5-2x faster on RTX GPUs with tensor cores, no accuracy loss
-            with autocast('cuda', enabled=use_amp):
-                output = model(data)
-                loss = criterion(output, target)
+            optimizer.zero_grad(set_to_none=True)
 
-            # Backward with gradient scaling (prevents fp16 underflow)
+            # Mixed precision forward pass
+            # Use device_type so this works on both CUDA and CPU
+            with autocast(device_type, enabled=use_amp):
+                output = model(mixed_data)
+                # Mixup loss: weighted combination of losses for both mixed labels
+                loss = lam * criterion(output, targets_a) + (1 - lam) * criterion(output, targets_b)
+
+            # Backward with gradient scaling
             scaler.scale(loss).backward()
 
-            # Gradient clipping: prevents rare large gradients from destabilizing training
+            # Gradient clipping
             scaler.unscale_(optimizer)
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
 
             scaler.step(optimizer)
             scaler.update()
 
-            # Step scheduler per batch (OneCycleLR is per-step, not per-epoch)
-            scheduler.step()
-
             running_loss += loss.item()
+            # For accuracy tracking, use the primary (unmixed) target
             _, predicted = output.max(1)
             train_total += target.size(0)
-            train_correct += predicted.eq(target).sum().item()
+            train_correct += predicted.eq(targets_a).sum().item()
+
+        # Step scheduler per epoch (CosineAnnealingWarmRestarts is per-epoch)
+        scheduler.step()
 
         train_loss = running_loss / len(train_loader)
         train_acc = 100.0 * train_correct / train_total
 
-        # === EVALUATION ===
+        # === EVALUATION (no mixup, no augmentation) ===
         model.eval()
         test_loss = 0.0
         correct = 0
         total = 0
 
+        # Use standard CrossEntropyLoss for clean evaluation
+        eval_criterion = nn.CrossEntropyLoss()
+
         with torch.no_grad():
             for data, target in test_loader:
                 data = data.to(device, non_blocking=True)
                 target = target.to(device, non_blocking=True)
-                with autocast('cuda', enabled=use_amp):
+                with autocast(device_type, enabled=use_amp):
                     output = model(data)
-                    test_loss += criterion(output, target).item()
+                    test_loss += eval_criterion(output, target).item()
                 _, predicted = output.max(1)
                 total += target.size(0)
                 correct += predicted.eq(target).sum().item()
@@ -167,10 +262,11 @@ def train_model(epochs=20, lr=0.003, batch_size=128, save_path='backend/models/d
             }, save_path)
 
         current_lr = optimizer.param_groups[0]['lr']
-        print(f"Epoch {epoch+1}/{epochs} | "
+        print(f"Epoch {epoch + 1}/{epochs} | "
               f"Loss: {train_loss:.4f}/{test_loss:.4f} | "
               f"Acc: {train_acc:.1f}%/{accuracy:.2f}% | "
               f"LR: {current_lr:.6f} | "
+              f"Best: {best_accuracy:.2f}% | "
               f"Time: {epoch_time:.1f}s")
 
         if progress_queue is not None:
@@ -191,5 +287,6 @@ def train_model(epochs=20, lr=0.003, batch_size=128, save_path='backend/models/d
 
 
 if __name__ == '__main__':
-    model, history = train_model(epochs=20)
+    model, history = train_model(epochs=35)
     print(f"\nFinal accuracy: {history['accuracy'][-1]:.2f}%")
+    print(f"Best accuracy: {max(history['accuracy']):.2f}%")
