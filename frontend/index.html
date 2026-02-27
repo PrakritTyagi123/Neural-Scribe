@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>NeuralScribe — Handwriting Recognition</title>
+<title>NeuralScribe — Handwriting + Math Recognition</title>
 <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600;700;800&family=Outfit:wght@300;400;500;600;700;800&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/static/style.css">
 </head>
@@ -14,9 +14,15 @@
   <header class="hdr">
     <div class="brand">
       <span class="brand-name">Neural</span><span class="brand-scribe">Scribe</span>
-      <span class="brand-sub">EMNIST · 47 Classes</span>
+      <span class="brand-sub">76 Classes · EMNIST + Math + Greek</span>
     </div>
     <div class="hdr-r">
+      <!-- Context Mode Toggle -->
+      <div class="mode-group">
+        <button class="mode-btn active" data-mode="all">All</button>
+        <button class="mode-btn" data-mode="text">Text</button>
+        <button class="mode-btn" data-mode="math">Math</button>
+      </div>
       <div class="pill pill-off" id="sPill">
         <span class="dot"></span>
         <span id="sTxt">INIT</span>
@@ -46,11 +52,11 @@
       </div>
     </div>
 
-    <!-- R1C2: Neural Network (6 layers) -->
+    <!-- R1C2: Neural Network -->
     <div class="net-cell">
       <div class="net-top">
         <span class="card-t green">Network</span>
-        <span class="tag tag-green">CNN · 3.3M</span>
+        <span class="tag tag-green">CNN · 76 Classes</span>
       </div>
       <canvas class="net-canvas" id="netCvs"></canvas>
       <div class="net-labels">
@@ -59,7 +65,7 @@
         <span>Conv 2</span>
         <span>Dense 1</span>
         <span>Dense 2</span>
-        <span>Output (47)</span>
+        <span>Output (76)</span>
       </div>
     </div>
 
@@ -105,7 +111,10 @@
           <div class="pred-meta">
             <div class="lbl">Confidence</div>
             <div class="val" id="pConf">0.0%</div>
-            <div class="sub" id="pMs">—</div>
+            <div class="pred-sub-row">
+              <span class="sub" id="pMs">—</span>
+              <span class="cat-badge" id="pCat"></span>
+            </div>
           </div>
         </div>
         <div class="stats">
@@ -125,13 +134,14 @@
       </div>
     </div>
 
-    <!-- R2C2: Confidence Bars -->
+    <!-- R2C2: Confidence Bars (3 sections) -->
     <div class="card conf-cell">
       <div class="card-h">
         <span class="card-t">Probabilities</span>
-        <span class="tag">47 classes</span>
+        <span class="tag">76 classes</span>
       </div>
       <div class="conf-body">
+        <!-- Digits -->
         <div class="vb-section">
           <div class="vb-header">
             <span class="vb-title dig">Digits 0–9</span>
@@ -139,12 +149,21 @@
           </div>
           <div class="vb-row digits" id="digBars"></div>
         </div>
+        <!-- Letters -->
         <div class="vb-section">
           <div class="vb-header">
             <span class="vb-title let">Letters A–Z</span>
             <span class="vb-line let"></span>
           </div>
           <div class="vb-row letters" id="letBars"></div>
+        </div>
+        <!-- Symbols (NEW) -->
+        <div class="vb-section">
+          <div class="vb-header">
+            <span class="vb-title sym">Math + Greek</span>
+            <span class="vb-line sym"></span>
+          </div>
+          <div class="vb-row symbols" id="symBars"></div>
         </div>
       </div>
     </div>
@@ -164,6 +183,7 @@
   <!-- ======== FOOTER ======== -->
   <div class="ftr">
     <span id="fSt">INITIALIZING...</span>
+    <span id="fMode">ALL MODE</span>
     <span id="fFps">— FPS</span>
   </div>
 
@@ -172,7 +192,7 @@
 <!-- Toast -->
 <div class="toast" id="toast"></div>
 
-<!-- Train Modal — slider max 100 -->
+<!-- Train Modal — with dataset toggle -->
 <div class="modal-overlay" id="mTrain">
   <div class="modal-box">
     <h2>Train Network</h2>
@@ -180,6 +200,14 @@
     <div class="slider-group">
       <label>Epochs <span id="epCnt">35</span></label>
       <input type="range" id="epSl" min="5" max="100" value="35">
+    </div>
+    <div class="toggle-group">
+      <label class="toggle-label">
+        <input type="checkbox" id="symToggle" checked>
+        <span class="toggle-switch"></span>
+        <span class="toggle-text">Include Math + Greek Symbols</span>
+      </label>
+      <span class="toggle-hint">Train on 76 classes (EMNIST + synthetic symbols). Uncheck for EMNIST-only (47 classes).</span>
     </div>
     <div class="modal-btns">
       <button class="btn" id="mCancel">Cancel</button>

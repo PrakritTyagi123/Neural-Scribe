@@ -1,24 +1,18 @@
 /**
- * networkViz.js — Neural Network Visualization (Performance Optimized)
+ * networkViz.js — Neural Network Visualization
  *
- * Renders 6-layer CNN visualization with:
- * - Layer caching: static wireframe drawn once, cached as ImageData
- * - Partial redraw: only active connections + neurons redrawn per frame
- * - requestAnimationFrame: controlled animation loop, no redundant draws
- * - Theme-aware: reads CSS vars on theme change, caches them
- *
- * 6 Layers: Input → Conv1 → Conv2 → Dense1 → Dense2 → Output(47)
+ * Updated: 76 labels, output shows top-12 predictions
  */
 
 import { state, subscribe } from '../state/appState.js';
 
 const LAYERS = [
-  { n: 12 },  // Input (sampled)
+  { n: 12 },  // Input
   { n: 10 },  // Conv1
   { n: 12 },  // Conv2
   { n: 12 },  // Dense1
   { n: 10 },  // Dense2
-  { n: 10 },  // Output (top-N)
+  { n: 12 },  // Output (top-N from 76 classes)
 ];
 
 const LABELS = [
@@ -26,15 +20,19 @@ const LABELS = [
   'A','B','C','D','E','F','G','H','I','J',
   'K','L','M','N','O','P','Q','R','S','T',
   'U','V','W','X','Y','Z',
-  'a','b','d','e','f','g','h','n','q','r','t'
+  'a','b','d','e','f','g','h','n','q','r','t',
+  '+','−','×','÷','=','≠',
+  '<','>','≤','≥','±','√',
+  'α','β','γ','δ','ε','θ',
+  'λ','μ','π','σ','τ','φ',
+  'ψ','ω','∞','∑','∫',
 ];
 
 let nc, nx;
 const dpr = window.devicePixelRatio || 1;
 
-// Cached state
 let cachedW = 0, cachedH = 0;
-let wireframeCache = null; // ImageData of static wireframe
+let wireframeCache = null;
 let cachedColors = {};
 let positions = [];
 let pendingDraw = false;
@@ -49,17 +47,13 @@ function init(canvasId) {
   cacheColors();
   drawIdle();
 
-  // Subscribe to relevant state changes
   subscribe('prediction', onPrediction);
   subscribe('theme', onThemeChange);
 
   window.addEventListener('resize', () => {
     invalidateCache();
-    if (lastActivations) {
-      scheduleDraw();
-    } else {
-      drawIdle();
-    }
+    if (lastActivations) scheduleDraw();
+    else drawIdle();
   });
 }
 
@@ -71,6 +65,7 @@ function cacheColors() {
     green: cs('--green'),
     red: cs('--red'),
     accent: cs('--accent'),
+    amber: cs('--amber'),
     t3: cs('--t3'),
     t4: cs('--t4'),
   };
@@ -85,11 +80,8 @@ function invalidateCache() {
 function onThemeChange() {
   cacheColors();
   invalidateCache();
-  if (lastActivations) {
-    scheduleDraw();
-  } else {
-    drawIdle();
-  }
+  if (lastActivations) scheduleDraw();
+  else drawIdle();
 }
 
 function onPrediction(pred) {
@@ -130,7 +122,6 @@ function sizeCanvas() {
   cachedH = h;
   wireframeCache = null;
 
-  // Compute node positions
   const px = 44;
   const gx = (w - px * 2) / (LAYERS.length - 1);
   positions = [];
@@ -147,14 +138,9 @@ function sizeCanvas() {
   return { w, h, changed: true };
 }
 
-/**
- * Draw static wireframe and cache it.
- * This is the expensive part — only done once per resize.
- */
 function buildWireframe(w, h) {
   nx.clearRect(0, 0, w, h);
 
-  // Sparse connections
   for (let l = 0; l < positions.length - 1; l++) {
     const step = Math.max(1, Math.floor(positions[l].length * positions[l + 1].length / 80));
     let c = 0;
@@ -171,7 +157,6 @@ function buildWireframe(w, h) {
     }
   }
 
-  // Idle dots
   for (const L of positions) {
     for (const n of L) {
       nx.beginPath();
@@ -181,7 +166,6 @@ function buildWireframe(w, h) {
     }
   }
 
-  // Cache as ImageData
   wireframeCache = nx.getImageData(0, 0, nc.width, nc.height);
 }
 
@@ -194,7 +178,6 @@ function drawIdle() {
 function drawActive(acts, probs, pred) {
   const { w, h } = sizeCanvas();
 
-  // Start from wireframe cache (fast blit instead of redrawing all connections)
   if (!wireframeCache) buildWireframe(w, h);
   nx.putImageData(wireframeCache, 0, 0);
 
@@ -202,7 +185,6 @@ function drawActive(acts, probs, pred) {
   const RED = cachedColors.red;
   const ACCENT = cachedColors.accent;
 
-  // Build activation arrays for 6 layers
   const outN = LAYERS[5].n;
   const probArr = (probs || []).map((p, i) => ({ p: p / 100, i, lbl: LABELS[i] || '?' }));
   const sorted = [...probArr].sort((a, b) => b.p - a.p);
@@ -220,10 +202,6 @@ function drawActive(acts, probs, pred) {
   }
   const predSlot = mid;
 
-  // Build activation arrays for 6 layers.
-  // Backend sends: conv1, conv2, fc1 (and optionally fc2).
-  // If fc2 is missing, split fc1 activations across Dense1 and Dense2
-  // so both layers light up properly.
   const conv1Acts = acts.conv1 || [];
   const conv2Acts = acts.conv2 || [];
   const fc1Acts = acts.fc1 || [];
@@ -234,11 +212,9 @@ function drawActive(acts, probs, pred) {
     dense1 = fc1Acts.slice(0, LAYERS[3].n);
     dense2 = fc2Acts.slice(0, LAYERS[4].n);
   } else {
-    // Split fc1 across both dense layers
     const half = Math.ceil(fc1Acts.length / 2);
     dense1 = fc1Acts.slice(0, half).slice(0, LAYERS[3].n);
     dense2 = fc1Acts.slice(half).slice(0, LAYERS[4].n);
-    // If not enough for dense2, reuse strongest from fc1
     if (dense2.length < LAYERS[4].n) {
       const sorted3 = [...fc1Acts].sort((a, b) => b - a);
       dense2 = sorted3.slice(0, LAYERS[4].n);
@@ -257,8 +233,6 @@ function drawActive(acts, probs, pred) {
     while (A[l].length < LAYERS[l].n) A[l].push(0);
   }
 
-  // Find predicted path neurons (top 3 per layer)
-  // Low threshold (0.05) so connections always appear
   const pathN = LAYERS.map(() => new Set());
   pathN[LAYERS.length - 1].add(predSlot);
   for (let l = LAYERS.length - 2; l >= 0; l--) {
@@ -268,7 +242,7 @@ function drawActive(acts, probs, pred) {
     }
   }
 
-  // Red connections (non-predicted active paths)
+  // Red connections
   for (let l = 0; l < positions.length - 1; l++) {
     for (let i = 0; i < positions[l].length; i++) {
       for (let j = 0; j < positions[l + 1].length; j++) {
@@ -287,7 +261,7 @@ function drawActive(acts, probs, pred) {
     }
   }
 
-  // Green connections (predicted path)
+  // Green connections
   for (let l = 0; l < positions.length - 1; l++) {
     for (let i = 0; i < positions[l].length; i++) {
       for (let j = 0; j < positions[l + 1].length; j++) {
@@ -297,12 +271,10 @@ function drawActive(acts, probs, pred) {
         nx.beginPath();
         nx.moveTo(positions[l][i].x, positions[l][i].y);
         nx.lineTo(positions[l + 1][j].x, positions[l + 1][j].y);
-        // Glow
         nx.strokeStyle = GREEN;
         nx.globalAlpha = 0.06 + str * 0.06;
         nx.lineWidth = 4 + str * 3;
         nx.stroke();
-        // Crisp line
         nx.globalAlpha = 0.35 + str * 0.5;
         nx.lineWidth = 0.8 + str * 1.2;
         nx.stroke();
@@ -319,7 +291,6 @@ function drawActive(acts, probs, pred) {
       const isOnPath = pathN[l].has(i);
       const r = isOnPath ? (4.5 + a * 2.5) : (3.5 + a * 1.5);
 
-      // Path glow
       if (isOnPath) {
         nx.beginPath();
         nx.arc(nd.x, nd.y, r + 3, 0, Math.PI * 2);
@@ -329,7 +300,6 @@ function drawActive(acts, probs, pred) {
         nx.globalAlpha = 1;
       }
 
-      // Main dot
       nx.beginPath();
       nx.arc(nd.x, nd.y, r, 0, Math.PI * 2);
       nx.fillStyle = isOnPath ? GREEN : ACCENT;
@@ -337,7 +307,6 @@ function drawActive(acts, probs, pred) {
       nx.fill();
       nx.globalAlpha = 1;
 
-      // Output labels
       if (l === positions.length - 1 && i < topOut.length) {
         const isP = i === predSlot;
         const lbl = topOut[i].lbl;
@@ -369,7 +338,6 @@ function drawActive(acts, probs, pred) {
   }
 }
 
-/** Reset to idle state */
 function reset() {
   lastActivations = null;
   lastProbs = null;

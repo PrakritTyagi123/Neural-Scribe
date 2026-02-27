@@ -1,19 +1,17 @@
 """
-model.py - High-Accuracy CNN for EMNIST ByMerge 47-Class Recognition
+model.py - CNN for EMNIST + Math/Greek Symbol Recognition (76 classes)
 
-Architecture: ResNet-style with SE attention, optimized for handwritten characters.
+Expanded from 47 → 76 classes with wider channels to handle:
+- Original EMNIST characters (digits, letters)
+- Math operators (+, −, ×, ÷, =, √, etc.)
+- Greek letters (α, β, γ, δ, θ, π, σ, ω, etc.)
+- Special symbols (∞, ∑, ∫)
 
-Improvements over original:
-- Wider channels: 32→64→160→320→256 gives more feature slots for 47 confusable classes
-- 4th ResBlock: extra depth for learning fine-grained character distinctions (O/0, l/1/I, S/5)
-- Stochastic depth (drop_path): randomly drops entire ResBlocks during training,
-  acts as strong regularizer, prevents overfitting with increased capacity
-- ~650K parameters (was ~420K) — still small, but enough capacity for 47 classes
-
-Why wider > deeper:
-For small 28×28 images, going deeper than 4 blocks hurts because spatial resolution
-gets too small. Going wider (more channels) lets the model learn more features per
-spatial location, which is exactly what you need for distinguishing similar characters.
+Architecture changes vs 47-class version:
+- Wider block3: 160→384 (was 160→320) for more feature capacity
+- Wider block4: 384→320 (was 320→256) to preserve more features
+- FC: 320→76 (was 256→47)
+- ~3.8M parameters (was ~3.3M)
 """
 import torch
 import torch.nn as nn
@@ -22,11 +20,7 @@ from backend.train.dataset import NUM_CLASSES
 
 
 class SEBlock(nn.Module):
-    """
-    Squeeze-and-Excitation: channel attention mechanism.
-    Learns to weight feature channels by their importance.
-    Cheap (few params) but effective for character discrimination.
-    """
+    """Squeeze-and-Excitation: channel attention mechanism."""
     def __init__(self, channels, reduction=4):
         super().__init__()
         mid = max(channels // reduction, 8)
@@ -46,11 +40,7 @@ class SEBlock(nn.Module):
 
 
 class DropPath(nn.Module):
-    """
-    Stochastic depth: randomly drops entire residual blocks during training.
-    At test time, all blocks are active (but scaled by keep probability).
-    This prevents co-adaptation between blocks — each block must be useful on its own.
-    """
+    """Stochastic depth: randomly drops entire residual blocks during training."""
     def __init__(self, drop_prob=0.0):
         super().__init__()
         self.drop_prob = drop_prob
@@ -59,20 +49,14 @@ class DropPath(nn.Module):
         if not self.training or self.drop_prob == 0.0:
             return x
         keep_prob = 1 - self.drop_prob
-        # Create random tensor: shape (batch_size, 1, 1, 1)
         shape = (x.shape[0],) + (1,) * (x.ndim - 1)
         random_tensor = torch.rand(shape, dtype=x.dtype, device=x.device)
         random_tensor = torch.floor(random_tensor + keep_prob)
-        # Scale to maintain expected values
         return x * random_tensor / keep_prob
 
 
 class ResBlock(nn.Module):
-    """
-    Residual block with BatchNorm, SE attention, and optional stochastic depth.
-
-    Structure: Conv→BN→ReLU→Conv→BN→SE→DropPath→Add→ReLU
-    """
+    """Residual block with BatchNorm, SE attention, and optional stochastic depth."""
     def __init__(self, in_ch, out_ch, stride=1, use_se=True, drop_path=0.0):
         super().__init__()
         self.conv1 = nn.Conv2d(in_ch, out_ch, 3, stride=stride, padding=1, bias=False)
@@ -82,7 +66,6 @@ class ResBlock(nn.Module):
         self.se = SEBlock(out_ch) if use_se else nn.Identity()
         self.drop_path = DropPath(drop_path) if drop_path > 0 else nn.Identity()
 
-        # Shortcut: match dimensions if channels or spatial size changed
         self.shortcut = nn.Identity()
         if stride != 1 or in_ch != out_ch:
             self.shortcut = nn.Sequential(
@@ -94,7 +77,7 @@ class ResBlock(nn.Module):
         out = F.relu(self.bn1(self.conv1(x)), inplace=True)
         out = self.bn2(self.conv2(out))
         out = self.se(out)
-        out = self.drop_path(out)  # Stochastic depth on residual branch
+        out = self.drop_path(out)
         out = F.relu(out + self.shortcut(x), inplace=True)
         return out
 
@@ -103,40 +86,31 @@ class DigitCNN(nn.Module):
     def __init__(self):
         super().__init__()
 
-        # Stem: single conv to expand from 1 channel
+        # Stem
         self.stem = nn.Sequential(
             nn.Conv2d(1, 32, 3, padding=1, bias=False),
             nn.BatchNorm2d(32),
             nn.ReLU(inplace=True)
         )
 
-        # Progressive stochastic depth: deeper blocks have higher drop probability
-        # This encourages earlier layers to learn strong features
         # 28x28 → 14x14
         self.block1 = ResBlock(32, 64, stride=2, drop_path=0.05)
         # 14x14 → 7x7
         self.block2 = ResBlock(64, 160, stride=2, drop_path=0.10)
-        # 7x7 → 7x7 (keep resolution — characters are small)
-        self.block3 = ResBlock(160, 320, stride=1, drop_path=0.15)
-        # 7x7 → 7x7 (extra refinement block for fine-grained discrimination)
-        self.block4 = ResBlock(320, 256, stride=1, drop_path=0.20)
+        # 7x7 → 7x7 — wider for 76 classes
+        self.block3 = ResBlock(160, 384, stride=1, drop_path=0.15)
+        # 7x7 → 7x7 — refinement
+        self.block4 = ResBlock(384, 320, stride=1, drop_path=0.20)
 
-        # Global average pool: (B, 256, 7, 7) → (B, 256)
+        # Global average pool → classifier
         self.gap = nn.AdaptiveAvgPool2d(1)
         self.dropout = nn.Dropout(0.4)
-        self.fc = nn.Linear(256, NUM_CLASSES)
+        self.fc = nn.Linear(320, NUM_CLASSES)
 
-        # Store activations for visualization
         self._activations = {}
-
-        # Better weight initialization
         self._init_weights()
 
     def _init_weights(self):
-        """
-        Kaiming initialization for conv/linear layers.
-        Zero-init final BN in each residual block for better initial training.
-        """
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
                 nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
@@ -148,7 +122,6 @@ class DigitCNN(nn.Module):
                 if m.bias is not None:
                     nn.init.zeros_(m.bias)
 
-        # Zero-init last BN in residual blocks
         for m in self.modules():
             if isinstance(m, ResBlock):
                 nn.init.zeros_(m.bn2.weight)
@@ -163,7 +136,6 @@ class DigitCNN(nn.Module):
         self._activations['conv2'] = x.detach()
 
         x = self.block3(x)
-        # Store block3 activations as 'fc1' for frontend compatibility
         self._activations['fc1'] = x.detach()
 
         x = self.block4(x)

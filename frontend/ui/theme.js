@@ -1,8 +1,5 @@
 /**
  * theme.js — Theme Manager
- *
- * Handles dark/light toggle with localStorage persistence.
- * Updates CSS data-theme attribute and notifies state.
  */
 
 import { state, update } from '../state/appState.js';

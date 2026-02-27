@@ -1,20 +1,13 @@
 /**
  * appState.js — Reactive State Manager
  *
- * Central state store with pub/sub. All UI modules subscribe to state
- * changes and re-render only what changed. No direct DOM mutation from
- * event handlers — they update state, state notifies subscribers.
- *
- * Usage:
- *   import { state, subscribe, update } from './state/appState.js';
- *   subscribe('prediction', (pred) => renderPrediction(pred));
- *   update({ prediction: { label: '7', confidence: 94.2 } });
+ * Updated: Added 'mode' state for context mode switching (all/text/math)
  */
 
 const state = {
   // Connection
   connected: false,
-  status: 'init', // 'init' | 'live' | 'training' | 'offline'
+  status: 'init',
 
   // Model
   modelLoaded: false,
@@ -22,7 +15,9 @@ const state = {
 
   // Prediction
   prediction: null,
-  // { label, class_index, confidence, probabilities, activations, inference_ms, is_digit, is_upper, is_lower }
+
+  // Context Mode: 'all' | 'text' | 'math'
+  mode: 'all',
 
   // Training
   training: false,
@@ -34,6 +29,7 @@ const state = {
   bestAccuracy: 0,
   epochTime: 0,
   lr: 0,
+  includeSymbols: true,
 
   // History (for charts)
   history: {
@@ -58,16 +54,8 @@ const state = {
   error: null,
 };
 
-// Subscribers: key → Set of callbacks
-// Special key '*' gets all changes
 const subscribers = new Map();
 
-/**
- * Subscribe to state changes.
- * @param {string|string[]} keys - State key(s) to watch, or '*' for all
- * @param {function} callback - Called with (newValue, key, fullState)
- * @returns {function} Unsubscribe function
- */
 function subscribe(keys, callback) {
   const keyList = Array.isArray(keys) ? keys : [keys];
   for (const key of keyList) {
@@ -82,11 +70,6 @@ function subscribe(keys, callback) {
   };
 }
 
-/**
- * Update state and notify subscribers.
- * Only notifies if value actually changed (shallow comparison).
- * @param {object} patch - Partial state to merge
- */
 function update(patch) {
   const changed = [];
 
@@ -99,7 +82,6 @@ function update(patch) {
 
   if (changed.length === 0) return;
 
-  // Notify specific key subscribers
   for (const key of changed) {
     const subs = subscribers.get(key);
     if (subs) {
@@ -110,7 +92,6 @@ function update(patch) {
     }
   }
 
-  // Notify wildcard subscribers
   const wildcard = subscribers.get('*');
   if (wildcard) {
     for (const cb of wildcard) {
@@ -120,16 +101,11 @@ function update(patch) {
   }
 }
 
-/**
- * Batch update for history — avoids triggering per-element.
- * Pushes to history arrays and notifies once.
- */
 function pushHistory(trainLoss, testLoss, accuracy) {
   state.history.train_loss.push(trainLoss);
   state.history.test_loss.push(testLoss);
   state.history.accuracy.push(accuracy);
 
-  // Notify history subscribers
   const subs = subscribers.get('history');
   if (subs) {
     for (const cb of subs) {
@@ -139,9 +115,6 @@ function pushHistory(trainLoss, testLoss, accuracy) {
   }
 }
 
-/**
- * Replace entire history (on init or training complete).
- */
 function setHistory(history) {
   state.history = {
     train_loss: history.train_loss || [],
@@ -158,9 +131,6 @@ function setHistory(history) {
   }
 }
 
-/**
- * Update FPS tracking.
- */
 function trackInference(ms) {
   state.fpsHistory.push(ms);
   if (state.fpsHistory.length > 30) state.fpsHistory.shift();

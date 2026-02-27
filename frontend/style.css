@@ -1,6 +1,6 @@
 /* ================================================================
-   NEURALSCRIBE — Design System
-   Aesthetic: Refined Industrial with neural + handwriting motifs
+   NEURALSCRIBE — Design System (76 Classes Edition)
+   Added: Symbol bar colors, mode toggle, category badges, toggle switch
    ================================================================ */
 :root {
   --font: 'Outfit', sans-serif;
@@ -45,6 +45,9 @@
   --violet: #a78bfa;
   --violet-dim: rgba(167,139,250,0.08);
   --violet-glow: rgba(167,139,250,0.12);
+  --rose: #fb7185;
+  --rose-dim: rgba(251,113,133,0.08);
+  --rose-glow: rgba(251,113,133,0.12);
   --bar-bg: #16161d;
   --shadow: none;
   --canvas-border: var(--accent);
@@ -92,6 +95,9 @@
   --violet: #7c3aed;
   --violet-dim: rgba(124,58,237,0.06);
   --violet-glow: rgba(124,58,237,0.08);
+  --rose: #e11d48;
+  --rose-dim: rgba(225,29,72,0.06);
+  --rose-glow: rgba(225,29,72,0.08);
   --bar-bg: #ebebf0;
   --shadow: 0 1px 3px rgba(0,0,0,0.05), 0 4px 14px rgba(0,0,0,0.04);
   --canvas-border: var(--accent);
@@ -123,7 +129,6 @@ body {
   overflow-x: hidden;
 }
 
-/* Subtle ambient gradient */
 body::before {
   content: '';
   position: fixed;
@@ -196,6 +201,45 @@ body::before {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+/* ================================================================
+   CONTEXT MODE TOGGLE
+   ================================================================ */
+.mode-group {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  margin-right: 4px;
+}
+
+.mode-btn {
+  padding: 5px 12px;
+  border: none;
+  background: var(--surface);
+  color: var(--t3);
+  font-family: var(--mono);
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: all var(--t) var(--ease);
+  border-right: 1px solid var(--border);
+}
+
+.mode-btn:last-child { border-right: none; }
+
+.mode-btn:hover {
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+
+.mode-btn.active {
+  background: var(--accent-dim);
+  color: var(--accent);
+  box-shadow: inset 0 -2px 0 var(--accent);
 }
 
 /* ================================================================
@@ -489,7 +533,7 @@ body::before {
 }
 
 /* ================================================================
-   CONTROLS + PREDICTION (Bottom Left)
+   CONTROLS + PREDICTION
    ================================================================ */
 .bot-left {
   grid-row: 2; grid-column: 1;
@@ -509,7 +553,6 @@ body::before {
   font-size: 0.72rem;
 }
 
-/* Prediction */
 .pred-wrap {
   display: flex;
   align-items: center;
@@ -522,7 +565,7 @@ body::before {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: var(--display);
+  font-family: var(--display), 'Noto Sans Math', 'STIX Two Math', sans-serif;
   font-size: 2.6rem;
   font-weight: 800;
   color: var(--accent);
@@ -554,12 +597,33 @@ body::before {
   color: var(--accent);
 }
 
+.pred-sub-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 1px;
+}
+
 .pred-meta .sub {
   font-family: var(--mono);
   font-size: 0.68rem;
   color: var(--t3);
-  margin-top: 1px;
 }
+
+/* Category Badge */
+.cat-badge {
+  font-family: var(--mono);
+  font-size: 0.55rem;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.cat-badge.cat-dig { background: var(--accent-dim); color: var(--accent); }
+.cat-badge.cat-let { background: var(--violet-dim); color: var(--violet); }
+.cat-badge.cat-sym { background: var(--rose-dim); color: var(--rose); }
 
 /* Stats */
 .stats {
@@ -627,7 +691,7 @@ body::before {
 }
 
 /* ================================================================
-   CONFIDENCE BARS
+   CONFIDENCE BARS (3 sections)
    ================================================================ */
 .conf-cell {
   grid-row: 2; grid-column: 2;
@@ -639,14 +703,15 @@ body::before {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
+  overflow-y: auto;
 }
 
 .vb-header {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
 
 .vb-title {
@@ -660,6 +725,7 @@ body::before {
 
 .vb-title.dig { color: var(--accent); }
 .vb-title.let { color: var(--violet); }
+.vb-title.sym { color: var(--rose); }
 
 .vb-line {
   flex: 1; height: 1px;
@@ -667,6 +733,7 @@ body::before {
 
 .vb-line.dig { background: linear-gradient(90deg, var(--accent-dim), transparent); }
 .vb-line.let { background: linear-gradient(90deg, var(--violet-dim), transparent); }
+.vb-line.sym { background: linear-gradient(90deg, var(--rose-dim), transparent); }
 
 .vb-row {
   display: flex;
@@ -674,8 +741,9 @@ body::before {
   align-items: flex-end;
 }
 
-.vb-row.digits { height: 160px; }
-.vb-row.letters { height: 110px; }
+.vb-row.digits { height: 120px; }
+.vb-row.letters { height: 80px; }
+.vb-row.symbols { height: 80px; }
 
 .vbar {
   flex: 1;
@@ -710,6 +778,7 @@ body::before {
 
 .vbar-fill.dig { background: var(--accent); }
 .vbar-fill.let { background: var(--violet); }
+.vbar-fill.sym { background: var(--rose); }
 
 .vbar-fill.hit { opacity: 1; }
 
@@ -723,9 +792,14 @@ body::before {
   background: linear-gradient(0deg, var(--violet), color-mix(in srgb, var(--violet) 70%, white));
 }
 
+.vbar-fill.sym.hit {
+  box-shadow: 0 0 10px var(--rose-glow), 0 -6px 16px var(--rose-glow);
+  background: linear-gradient(0deg, var(--rose), color-mix(in srgb, var(--rose) 70%, white));
+}
+
 .vbar-lbl {
   font-family: var(--mono);
-  font-size: 0.62rem;
+  font-size: 0.55rem;
   font-weight: 600;
   color: var(--t4);
   transition: color 0.15s;
@@ -734,6 +808,7 @@ body::before {
 
 .vbar-lbl.dig.hit { color: var(--accent); }
 .vbar-lbl.let.hit { color: var(--violet); }
+.vbar-lbl.sym.hit { color: var(--rose); }
 
 /* ================================================================
    FOOTER
@@ -838,7 +913,7 @@ body::before {
   color: var(--accent);
 }
 
-.slider-group { margin-bottom: 20px; }
+.slider-group { margin-bottom: 16px; }
 
 .slider-group label {
   display: flex;
@@ -874,6 +949,68 @@ input[type=range]::-webkit-slider-thumb {
   box-shadow: 0 0 10px var(--accent-glow);
 }
 
+/* Toggle Switch for Dataset Selection */
+.toggle-group {
+  margin-bottom: 18px;
+}
+
+.toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--t2);
+}
+
+.toggle-label input[type="checkbox"] {
+  display: none;
+}
+
+.toggle-switch {
+  width: 36px;
+  height: 20px;
+  background: var(--bar-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  position: relative;
+  transition: all var(--t) var(--ease);
+  flex-shrink: 0;
+}
+
+.toggle-switch::after {
+  content: '';
+  position: absolute;
+  top: 2px; left: 2px;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: var(--t3);
+  transition: all var(--t) var(--ease);
+}
+
+.toggle-label input:checked + .toggle-switch {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+}
+
+.toggle-label input:checked + .toggle-switch::after {
+  left: 18px;
+  background: var(--accent);
+}
+
+.toggle-text {
+  font-weight: 500;
+}
+
+.toggle-hint {
+  display: block;
+  font-family: var(--mono);
+  font-size: 0.65rem;
+  color: var(--t4);
+  margin-top: 6px;
+  padding-left: 46px;
+}
+
 .modal-btns {
   display: flex;
   gap: 8px;
@@ -899,6 +1036,14 @@ input[type=range]::-webkit-slider-thumb {
     grid-column: 1;
   }
   .net-cell { min-height: 350px; }
-  .vb-row.digits { height: 130px; }
-  .vb-row.letters { height: 90px; }
+  .vb-row.digits { height: 100px; }
+  .vb-row.letters { height: 70px; }
+  .vb-row.symbols { height: 70px; }
+
+  .hdr {
+    flex-direction: column;
+    gap: 10px;
+    align-items: flex-start;
+  }
+  .hdr-r { flex-wrap: wrap; }
 }

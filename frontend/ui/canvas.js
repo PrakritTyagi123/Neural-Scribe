@@ -1,9 +1,7 @@
 /**
  * canvas.js — Drawing Canvas with Undo
  *
- * Handles all drawing interaction, stroke tracking, undo,
- * and pixel extraction (28x28 with center-of-mass).
- * Publishes hasContent to state. Calls onDraw callback for predictions.
+ * Updated: Added triggerPredict() export for re-predicting on mode change
  */
 
 import { update } from '../state/appState.js';
@@ -25,13 +23,11 @@ function init(canvasId, hintId, onDraw) {
 
   resize();
 
-  // Mouse events
   dc.addEventListener('mousedown', startDraw);
   dc.addEventListener('mousemove', moveDraw);
   dc.addEventListener('mouseup', endDraw);
   dc.addEventListener('mouseleave', endDraw);
 
-  // Touch events
   dc.addEventListener('touchstart', startDraw, { passive: false });
   dc.addEventListener('touchmove', moveDraw, { passive: false });
   dc.addEventListener('touchend', endDraw);
@@ -132,31 +128,24 @@ function endDraw() {
 }
 
 function requestPrediction() {
-  if (Date.now() - lastReqTime < 50) return; // throttle 50ms
+  if (Date.now() - lastReqTime < 50) return;
   lastReqTime = Date.now();
-  // Use hasContent flag — canvas already has current stroke rendered on it
-  // even before it's pushed to the strokes array on mouseup
   if (onDrawCallback && (strokes.length > 0 || currentStroke.length > 1)) {
     onDrawCallback(getPixels());
   }
 }
 
 /**
- * Extract 28x28 pixel array — crop + scale, NO centering.
- *
- * We crop to bounding box and scale to fill 28x28.
- * The backend preprocess.py then handles:
- * - Center-of-mass alignment (matches EMNIST training data)
- * - Gaussian smoothing (matches EMNIST stroke style)
- * - Transpose (matches EMNIST orientation)
- * - EMNIST normalization
- *
- * We do NOT center into a 20x20 sub-area here because the backend
- * does its own center-of-mass centering — double centering shifts
- * characters off-center and kills accuracy.
- *
- * Returns 784-length float array (0-255 grayscale).
+ * Public method: trigger a prediction with current canvas content.
+ * Used when mode changes to re-predict with new class mask.
  */
+function triggerPredict() {
+  if (onDrawCallback && strokes.length > 0) {
+    lastReqTime = 0; // Reset throttle
+    onDrawCallback(getPixels());
+  }
+}
+
 function getPixels() {
   const sd = dx.getImageData(0, 0, cvsSz, cvsSz);
   let x0 = cvsSz, y0 = cvsSz, x1 = 0, y1 = 0, found = false;
@@ -177,7 +166,6 @@ function getPixels() {
 
   if (!found) return Array(784).fill(0);
 
-  // Add small padding around bounding box
   const pad = Math.max(2, Math.round(cvsSz * 0.03));
   x0 = Math.max(0, x0 - pad);
   y0 = Math.max(0, y0 - pad);
@@ -187,7 +175,6 @@ function getPixels() {
   const cw = x1 - x0 + 1;
   const ch = y1 - y0 + 1;
 
-  // Scale bounding box content to fill 28x28 (maintain aspect ratio)
   const t = document.createElement('canvas');
   t.width = 28;
   t.height = 28;
@@ -195,7 +182,6 @@ function getPixels() {
   tc.fillStyle = '#000';
   tc.fillRect(0, 0, 28, 28);
 
-  // Fit into 28x28 maintaining aspect ratio, centered
   const scale = Math.min(28 / cw, 28 / ch);
   const dw = cw * scale;
   const dh = ch * scale;
@@ -209,16 +195,15 @@ function getPixels() {
     raw[i] = 0.299 * id.data[i * 4] + 0.587 * id.data[i * 4 + 1] + 0.114 * id.data[i * 4 + 2];
   }
 
-  // Rotate 90° counter-clockwise before sending.
+  // Rotate 90° CCW
   const rotated = new Float32Array(784);
   for (let r = 0; r < 28; r++) {
     for (let c = 0; c < 28; c++) {
-      // 90° CCW: new[27-c][r] = old[r][c]
       rotated[(27 - c) * 28 + r] = raw[r * 28 + c];
     }
   }
 
-  // Flip vertically (mirror top↔bottom)
+  // Flip vertically
   const flipped = new Float32Array(784);
   for (let r = 0; r < 28; r++) {
     for (let c = 0; c < 28; c++) {
@@ -229,4 +214,4 @@ function getPixels() {
   return Array.from(flipped);
 }
 
-export { init, clear, undo, resize };
+export { init, clear, undo, resize, triggerPredict };

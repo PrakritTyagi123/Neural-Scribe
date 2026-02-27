@@ -1,42 +1,24 @@
 """
-preprocess.py - Canvas Data → EMNIST Format (Fixed)
+preprocess.py - Canvas Data → Model Format
 
-Improvements over original:
-1. Transpose fix: applies the same transpose that training uses, ensuring the
-   model sees the same orientation at inference as during training.
-2. Center-of-mass centering: EMNIST uses center-of-mass to position characters,
-   not bounding-box centering. This aligns inference input with training data.
-3. Morphological smoothing: slight Gaussian blur to better match EMNIST stroke style.
-4. Better normalization pipeline that exactly matches training transforms.
-
-The key principle: inference preprocessing must EXACTLY match training preprocessing.
-Any mismatch (orientation, centering method, normalization stats, pixel distribution)
-is a systematic error that no amount of model improvement can fix.
+Updated for 76 classes:
+- Wider center-of-mass shift clamp (±6px) for asymmetric symbols like ∫, ∑
+- Adaptive smoothing based on stroke density
+- Same pipeline otherwise (must match training exactly)
 """
 import torch
 import numpy as np
 
 
 def _center_of_mass(pixels_2d: np.ndarray) -> tuple[float, float]:
-    """
-    Compute center of mass (brightness-weighted centroid) of the image.
-
-    EMNIST and MNIST use center-of-mass to position characters in the 28×28 grid.
-    This is different from bounding-box centering:
-    - Bounding box center of "7": roughly middle of the character
-    - Center of mass of "7": shifted toward the horizontal top stroke (more ink there)
-
-    The model was trained on center-of-mass aligned images, so inference must match.
-    """
+    """Compute brightness-weighted centroid of the image."""
     total = pixels_2d.sum()
     if total < 1e-6:
-        return 14.0, 14.0  # default to center
+        return 14.0, 14.0
 
-    # Create coordinate grids
     rows = np.arange(pixels_2d.shape[0])
     cols = np.arange(pixels_2d.shape[1])
 
-    # Brightness-weighted average position
     cy = float(np.sum(rows[:, None] * pixels_2d) / total)
     cx = float(np.sum(cols[None, :] * pixels_2d) / total)
 
@@ -45,35 +27,32 @@ def _center_of_mass(pixels_2d: np.ndarray) -> tuple[float, float]:
 
 def preprocess_pixels(pixel_data: list[float], device=None) -> torch.Tensor:
     """
-    Convert 784-length pixel array from canvas to EMNIST-compatible tensor.
+    Convert 784-length pixel array from canvas to model-compatible tensor.
 
-    Pipeline (matches training exactly):
+    Pipeline:
     1. Reshape to 28×28
     2. Normalize to [0, 1]
-    3. Apply Gaussian smoothing to match EMNIST stroke style
-    4. Center-of-mass alignment (shift image so centroid is at center)
-    5. Transpose (matches TransposeImage() in training pipeline)
-    6. Normalize with EMNIST mean/std
-
-    This ensures the model sees the same data distribution at inference
-    as it saw during training.
+    3. Adaptive Gaussian smoothing
+    4. Center-of-mass alignment (wider ±6px clamp for symbols)
+    5. Transpose (matches EMNIST TransposeImage)
+    6. EMNIST normalization
     """
     if device is None:
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    EMNIST_MEAN = 0.1751
-    EMNIST_STD = 0.3332
+    MEAN = 0.1751
+    STD = 0.3332
 
-    # Step 1: Reshape to 28×28
+    # Step 1: Reshape
     pixels = np.array(pixel_data, dtype=np.float32).reshape(28, 28)
 
     # Step 2: Normalize to [0, 1]
     pixels = pixels / 255.0
 
-    # Step 3: Light Gaussian smoothing to better match EMNIST stroke style
-    # EMNIST strokes are slightly softer than canvas strokes due to the
-    # original scanning/processing pipeline. A small blur helps match this.
-    # Using a simple 3×3 kernel approximation (no scipy dependency)
+    # Step 3: Adaptive Gaussian smoothing
+    # Compute stroke density — thin strokes (symbols) get less smoothing
+    stroke_density = (pixels > 0.1).sum() / (28 * 28)
+
     kernel = np.array([[1, 2, 1],
                        [2, 4, 2],
                        [1, 2, 1]], dtype=np.float32) / 16.0
@@ -84,28 +63,24 @@ def preprocess_pixels(pixel_data: list[float], device=None) -> torch.Tensor:
         for j in range(28):
             smoothed[i, j] = np.sum(padded[i:i + 3, j:j + 3] * kernel)
 
-    # Blend: 70% original + 30% smoothed (mild smoothing)
-    pixels = 0.7 * pixels + 0.3 * smoothed
+    # Less smoothing for thin strokes (math symbols), more for thick strokes (letters)
+    blend = min(0.35, max(0.15, stroke_density * 1.5))
+    pixels = (1.0 - blend) * pixels + blend * smoothed
 
     # Step 4: Center-of-mass alignment
-    # Compute current center of mass
     cy, cx = _center_of_mass(pixels)
 
-    # Target center: (13.5, 13.5) — center of 28×28 grid (0-indexed)
     shift_y = 13.5 - cy
     shift_x = 13.5 - cx
 
-    # Apply sub-pixel shift via bilinear interpolation
-    # Clamp shift to prevent moving content off-screen
-    shift_y = np.clip(shift_y, -4, 4)
-    shift_x = np.clip(shift_x, -4, 4)
+    # Wider clamp for symbols like ∫, ∑ that have asymmetric mass distribution
+    shift_y = np.clip(shift_y, -6, 6)
+    shift_x = np.clip(shift_x, -6, 6)
 
     if abs(shift_y) > 0.5 or abs(shift_x) > 0.5:
-        # Integer part of shift
         iy, ix = int(np.round(shift_y)), int(np.round(shift_x))
         shifted = np.zeros_like(pixels)
 
-        # Source and destination ranges
         src_y0 = max(0, -iy)
         src_y1 = min(28, 28 - iy)
         src_x0 = max(0, -ix)
@@ -124,17 +99,11 @@ def preprocess_pixels(pixel_data: list[float], device=None) -> torch.Tensor:
 
         pixels = shifted
 
-    # Step 5: Transpose — CRITICAL
-    # EMNIST images are transposed relative to natural orientation.
-    # Training pipeline applies TransposeImage() which does tensor.transpose(1, 2).
-    # For a 2D numpy array, this is equivalent to .T
-    # Since the canvas captures images in natural orientation and training
-    # transposes the EMNIST data to match, we need to transpose here too
-    # so the model sees the same orientation.
+    # Step 5: Transpose
     pixels = pixels.T
 
-    # Step 6: Normalize with EMNIST statistics (matches training Normalize)
-    pixels = (pixels - EMNIST_MEAN) / EMNIST_STD
+    # Step 6: Normalize
+    pixels = (pixels - MEAN) / STD
 
     # Convert to tensor: (1, 1, 28, 28)
     tensor = torch.tensor(pixels, dtype=torch.float32).unsqueeze(0).unsqueeze(0)

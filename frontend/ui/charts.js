@@ -1,9 +1,6 @@
 /**
  * charts.js — Training Charts (Accuracy & Loss)
- *
- * Renders line charts for accuracy and loss history.
- * Subscribes to state.history changes and re-renders.
- * Theme-aware via CSS variable reads.
+ * Unchanged from original.
  */
 
 import { subscribe } from '../state/appState.js';
@@ -78,7 +75,6 @@ function renderChart(cv, data, o) {
   const mx = o.maxY ?? Math.max(...data) * 1.05;
   const rn = mx - mn || 1;
 
-  // Grid lines
   ct.strokeStyle = gridColor;
   ct.lineWidth = 1;
   for (let i = 0; i <= 4; i++) {
@@ -94,7 +90,6 @@ function renderChart(cv, data, o) {
     ct.fillText(v.toFixed(v > 10 ? 1 : 3) + o.sfx, pd.l - 6, y + 3.5);
   }
 
-  // Line path
   const sx = data.length > 1 ? cW / (data.length - 1) : 0;
   ct.beginPath();
   for (let i = 0; i < data.length; i++) {
@@ -107,13 +102,11 @@ function renderChart(cv, data, o) {
   ct.lineJoin = 'round';
   ct.stroke();
 
-  // Glow
   ct.globalAlpha = 0.12;
   ct.lineWidth = 7;
   ct.stroke();
   ct.globalAlpha = 1;
 
-  // Fill gradient
   ct.lineTo(pd.l + (data.length - 1) * sx, pd.t + cH);
   ct.lineTo(pd.l, pd.t + cH);
   ct.closePath();
@@ -123,7 +116,6 @@ function renderChart(cv, data, o) {
   ct.fillStyle = gd;
   ct.fill();
 
-  // Dots
   for (let i = 0; i < data.length; i++) {
     const x = pd.l + i * sx;
     const y = pd.t + cH - ((data[i] - mn) / rn) * cH;

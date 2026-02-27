@@ -1,11 +1,12 @@
 """
-run_backend.py - Launch the Digit AI server
+run_backend.py - Launch NeuralScribe server
 """
 import uvicorn
 
 if __name__ == '__main__':
     print("=" * 50)
-    print("  Digit AI - Live Neural Network Dashboard")
+    print("  NeuralScribe — Handwriting + Math Recognition")
+    print("  76 Classes: Digits + Letters + Math + Greek")
     print("  Open http://localhost:8000 in your browser")
     print("=" * 50)
     uvicorn.run(

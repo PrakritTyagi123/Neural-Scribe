@@ -1,17 +1,11 @@
 /**
  * main.js — NeuralScribe Application Entry Point
  *
- * Wires together all modules:
- * - State manager (appState.js)
- * - Theme (theme.js)
- * - Canvas (canvas.js)
- * - Network visualization (networkViz.js)
- * - Charts (charts.js)
- * - WebSocket connection
- * - DOM bindings (subscribe state → update DOM)
- *
- * No module directly mutates DOM of another module.
- * All communication goes through state.
+ * Updated for 76 classes:
+ * - Context mode toggle (All / Text / Math)
+ * - Three confidence bar sections (Digits, Letters, Symbols)
+ * - Training dataset selection (EMNIST only vs Combined)
+ * - Mode sent with every prediction request
  */
 
 import { state, subscribe, update, pushHistory, setHistory, trackInference } from './state/appState.js';
@@ -20,11 +14,27 @@ import * as canvas from './ui/canvas.js';
 import * as netViz from './ui/networkViz.js';
 import * as charts from './ui/charts.js';
 
-// Expose state globally for charts module (avoids circular import)
 window.__NS_STATE__ = state;
 
-// ============ DOM REFERENCES ============
 const $ = id => document.getElementById(id);
+
+// ============ LABEL SYSTEM (76 classes) ============
+const ALL_LABELS = [
+  '0','1','2','3','4','5','6','7','8','9',
+  'A','B','C','D','E','F','G','H','I','J',
+  'K','L','M','N','O','P','Q','R','S','T',
+  'U','V','W','X','Y','Z',
+  'a','b','d','e','f','g','h','n','q','r','t',
+  '+','−','×','÷','=','≠',
+  '<','>','≤','≥','±','√',
+  'α','β','γ','δ','ε','θ',
+  'λ','μ','π','σ','τ','φ',
+  'ψ','ω','∞','∑','∫',
+];
+
+const LOWER_LABELS = ['a','b','d','e','f','g','h','n','q','r','t'];
+const MATH_LABELS = ['+','−','×','÷','=','≠','<','>','≤','≥','±','√'];
+const GREEK_LABELS = ['α','β','γ','δ','ε','θ','λ','μ','π','σ','τ','φ','ψ','ω','∞','∑','∫'];
 
 // ============ WEBSOCKET ============
 let ws = null;
@@ -48,9 +58,7 @@ function connectWS() {
     setTimeout(connectWS, 2000);
   };
 
-  ws.onerror = () => {
-    wsOk = false;
-  };
+  ws.onerror = () => { wsOk = false; };
 }
 
 function sendWS(msg) {
@@ -83,12 +91,11 @@ function handleMessage(msg) {
         update({ prediction: msg.data });
         trackInference(msg.data.inference_ms);
       }
-      // If new pixels were queued while waiting, send them now
       if (queuedPixels) {
         const px = queuedPixels;
         queuedPixels = null;
         pendingPred = true;
-        sendWS({ type: 'predict', data: { pixels: px } });
+        sendWS({ type: 'predict', data: { pixels: px, mode: state.mode } });
       }
       break;
 
@@ -157,26 +164,22 @@ function handleMessage(msg) {
 }
 
 // ============ PREDICTION REQUEST ============
-let queuedPixels = null; // Latest pixels waiting to be sent
+let queuedPixels = null;
 
 function requestPrediction(pixels) {
   if (!wsOk || !state.modelLoaded) return;
 
   if (pendingPred) {
-    // Already waiting for a response — queue the latest pixels.
-    // When response arrives, we'll send these immediately.
     queuedPixels = pixels;
     return;
   }
 
   pendingPred = true;
   queuedPixels = null;
-  sendWS({ type: 'predict', data: { pixels } });
+  sendWS({ type: 'predict', data: { pixels, mode: state.mode } });
 }
 
 // ============ DOM SUBSCRIPTIONS ============
-// These connect state changes to DOM updates. Each subscription is focused.
-
 function initDOMBindings() {
   // Status pill
   subscribe('status', (status) => {
@@ -186,36 +189,25 @@ function initDOMBindings() {
 
     switch (status) {
       case 'live':
-        pill.className = 'pill pill-ok';
-        txt.textContent = 'LIVE';
-        fst.textContent = 'LIVE INFERENCE ACTIVE';
-        break;
+        pill.className = 'pill pill-ok'; txt.textContent = 'LIVE';
+        fst.textContent = 'LIVE INFERENCE ACTIVE'; break;
       case 'training':
-        pill.className = 'pill pill-tr';
-        txt.textContent = 'TRAINING';
-        fst.textContent = 'TRAINING IN PROGRESS';
-        break;
+        pill.className = 'pill pill-tr'; txt.textContent = 'TRAINING';
+        fst.textContent = 'TRAINING IN PROGRESS'; break;
       case 'offline':
-        pill.className = 'pill pill-off';
-        txt.textContent = 'OFFLINE';
-        fst.textContent = 'RECONNECTING...';
-        break;
+        pill.className = 'pill pill-off'; txt.textContent = 'OFFLINE';
+        fst.textContent = 'RECONNECTING...'; break;
       default:
-        pill.className = 'pill pill-off';
-        txt.textContent = 'INIT';
+        pill.className = 'pill pill-off'; txt.textContent = 'INIT';
         fst.textContent = 'INITIALIZING...';
     }
   });
 
-  // Model status tag
   subscribe('modelLoaded', (loaded) => {
     $('mSt').textContent = loaded ? 'Ready' : 'No Model';
   });
 
-  // Device
-  subscribe('device', (dev) => {
-    $('sDev').textContent = dev;
-  });
+  subscribe('device', (dev) => { $('sDev').textContent = dev; });
 
   // Prediction display
   subscribe('prediction', (pred) => {
@@ -237,16 +229,31 @@ function initDOMBindings() {
     conf.textContent = pred.confidence + '%';
     ms.textContent = pred.inference_ms + ' ms';
 
+    // Show category badge
+    const badge = $('pCat');
+    if (pred.is_digit) { badge.textContent = 'DIGIT'; badge.className = 'cat-badge cat-dig'; }
+    else if (pred.is_upper) { badge.textContent = 'UPPER'; badge.className = 'cat-badge cat-let'; }
+    else if (pred.is_lower) { badge.textContent = 'LOWER'; badge.className = 'cat-badge cat-let'; }
+    else if (pred.is_math) { badge.textContent = 'MATH'; badge.className = 'cat-badge cat-sym'; }
+    else if (pred.is_greek) { badge.textContent = 'GREEK'; badge.className = 'cat-badge cat-sym'; }
+    else { badge.textContent = ''; badge.className = 'cat-badge'; }
+
     renderBars(pred);
   });
 
-  // FPS display
+  // Mode display
+  subscribe('mode', (mode) => {
+    document.querySelectorAll('.mode-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.mode === mode);
+    });
+    $('fMode').textContent = mode.toUpperCase() + ' MODE';
+  });
+
   subscribe(['avgFps', 'avgInferenceMs'], () => {
     $('fFps').textContent = state.avgFps + ' FPS';
     $('sInf').textContent = state.avgInferenceMs + ' ms';
   });
 
-  // Training progress
   subscribe(['epoch', 'totalEpochs', 'accuracy', 'trainLoss', 'testLoss', 'epochTime'], () => {
     if (!state.training) return;
 
@@ -255,7 +262,6 @@ function initDOMBindings() {
     $('prgEp').textContent = `Epoch ${state.epoch}/${state.totalEpochs}`;
     $('prgAc').textContent = state.accuracy + '%';
 
-    // ETA calculation
     if (state.epoch > 0 && state.epochTime > 0) {
       const remaining = (state.totalEpochs - state.epoch) * state.epochTime;
       $('prgEta').textContent = '~' + formatTime(remaining) + ' left';
@@ -266,12 +272,10 @@ function initDOMBindings() {
     $('epTag').textContent = state.epoch + ' ep';
   });
 
-  // Training state → progress bar visibility
   subscribe('training', (training) => {
     $('prg').classList.toggle('on', training);
   });
 
-  // Accuracy/Loss display (outside training)
   subscribe('accuracy', (acc) => {
     if (!state.training && acc > 0) {
       $('sAcc').textContent = parseFloat(acc).toFixed(2) + '%';
@@ -285,28 +289,36 @@ function initDOMBindings() {
     }
   });
 
-  // Error toast
   subscribe('error', (err) => {
     if (!err) return;
     showToast(err);
-    update({ error: null }); // Clear after showing
+    update({ error: null });
   });
 }
 
-// ============ CONFIDENCE BARS ============
-const LOWER_LABELS = ['a', 'b', 'd', 'e', 'f', 'g', 'h', 'n', 'q', 'r', 't'];
-
+// ============ CONFIDENCE BARS (3 sections) ============
 function buildBars() {
   const digC = $('digBars');
   const letC = $('letBars');
+  const symC = $('symBars');
   digC.innerHTML = '';
   letC.innerHTML = '';
+  symC.innerHTML = '';
 
+  // Digits 0-9
   for (let i = 0; i < 10; i++) {
     digC.innerHTML += `<div class="vbar"><div class="vbar-track"><div class="vbar-fill dig" id="db${i}"></div></div><div class="vbar-lbl dig" id="dl${i}">${i}</div></div>`;
   }
+
+  // Letters A-Z (combined upper+lower)
   for (let i = 0; i < 26; i++) {
     letC.innerHTML += `<div class="vbar"><div class="vbar-track"><div class="vbar-fill let" id="lb${i}"></div></div><div class="vbar-lbl let" id="ll${i}">${String.fromCharCode(97 + i)}</div></div>`;
+  }
+
+  // Symbols: Math operators + Greek letters (indices 47-75)
+  const symLabels = [...MATH_LABELS, ...GREEK_LABELS];
+  for (let i = 0; i < symLabels.length; i++) {
+    symC.innerHTML += `<div class="vbar"><div class="vbar-track"><div class="vbar-fill sym" id="sb${i}"></div></div><div class="vbar-lbl sym" id="sl${i}">${symLabels[i]}</div></div>`;
   }
 }
 
@@ -322,6 +334,12 @@ function clearBars() {
     $('ll' + i).className = 'vbar-lbl let';
     $('ll' + i).textContent = String.fromCharCode(97 + i);
   }
+  const symCount = MATH_LABELS.length + GREEK_LABELS.length;
+  for (let i = 0; i < symCount; i++) {
+    $('sb' + i).style.height = '0%';
+    $('sb' + i).className = 'vbar-fill sym';
+    $('sl' + i).className = 'vbar-lbl sym';
+  }
 }
 
 function renderBars(d) {
@@ -329,7 +347,7 @@ function renderBars(d) {
   const probs = d.probabilities || [];
   const ci = d.class_index != null ? d.class_index : -1;
 
-  // Digit bars
+  // Digit bars (indices 0-9)
   for (let i = 0; i < 10 && i < probs.length; i++) {
     $('db' + i).style.height = Math.min(probs[i], 100) + '%';
     if (ci === i) {
@@ -338,7 +356,7 @@ function renderBars(d) {
     }
   }
 
-  // Letter bars
+  // Letter bars (indices 10-46 combined into 26 letter slots)
   for (let i = 0; i < 26; i++) {
     const up = (10 + i < probs.length) ? probs[10 + i] : 0;
     const ch = String.fromCharCode(97 + i);
@@ -352,6 +370,19 @@ function renderBars(d) {
       $('lb' + i).className = 'vbar-fill let hit';
       $('ll' + i).className = 'vbar-lbl let hit';
       $('ll' + i).textContent = isLoHit ? ch : String.fromCharCode(65 + i);
+    }
+  }
+
+  // Symbol bars (indices 47-75 → bar indices 0-28)
+  const symLabels = [...MATH_LABELS, ...GREEK_LABELS];
+  for (let i = 0; i < symLabels.length; i++) {
+    const probIdx = 47 + i;
+    const p = probIdx < probs.length ? probs[probIdx] : 0;
+    $('sb' + i).style.height = Math.min(p, 100) + '%';
+
+    if (ci === probIdx) {
+      $('sb' + i).className = 'vbar-fill sym hit';
+      $('sl' + i).className = 'vbar-lbl sym hit';
     }
   }
 }
@@ -381,6 +412,19 @@ function initButtons() {
 
   $('btnUndo').addEventListener('click', () => canvas.undo());
 
+  // Context mode buttons
+  document.querySelectorAll('.mode-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const mode = btn.dataset.mode;
+      update({ mode });
+      // Re-predict with new mode if there's content
+      if (state.hasContent) {
+        canvas.triggerPredict();
+      }
+    });
+  });
+
+  // Train button
   $('btnTr').addEventListener('click', () => $('mTrain').classList.add('on'));
   $('mCancel').addEventListener('click', () => $('mTrain').classList.remove('on'));
 
@@ -390,9 +434,10 @@ function initButtons() {
 
   $('mStart').addEventListener('click', () => {
     const ep = +$('epSl').value;
+    const includeSymbols = $('symToggle').checked;
     $('mTrain').classList.remove('on');
     setHistory({ train_loss: [], test_loss: [], accuracy: [] });
-    sendWS({ type: 'train', data: { epochs: ep } });
+    sendWS({ type: 'train', data: { epochs: ep, include_symbols: includeSymbols } });
   });
 
   $('btnRs').addEventListener('click', () => {
@@ -425,9 +470,11 @@ function boot() {
   initDOMBindings();
   initButtons();
   connectWS();
+
+  // Set initial mode
+  update({ mode: 'all' });
 }
 
-// Boot when DOM is ready
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', boot);
 } else {
